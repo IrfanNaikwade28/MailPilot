@@ -1,8 +1,40 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { getCampaign } from '../api/client'
-import AgentCard from '../components/AgentCard'
 import StatusBadge from '../components/StatusBadge'
+
+const S = {
+  page: { maxWidth: 860, margin: '0 auto', padding: '32px 24px' },
+  breadcrumb: { fontSize: 13, color: '#6b7280', marginBottom: 20, display: 'flex', alignItems: 'center', gap: 6 },
+  breadBtn: { background: 'none', border: 'none', padding: 0, color: '#6b7280', fontSize: 13, cursor: 'pointer' },
+  header: { marginBottom: 28 },
+  titleRow: { display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16 },
+  title: { fontSize: 22, fontWeight: 700, color: '#111827', margin: 0 },
+  objective: { fontSize: 14, color: '#6b7280', marginTop: 6, lineHeight: 1.6 },
+  actions: { display: 'flex', gap: 8, flexShrink: 0, marginTop: 4 },
+  btnPrimary: { background: '#1d4ed8', color: '#fff', border: 'none', borderRadius: 6, padding: '8px 16px', fontSize: 14, fontWeight: 600 },
+  btnSecondary: { background: '#fff', color: '#374151', border: '1px solid #d1d5db', borderRadius: 6, padding: '8px 14px', fontSize: 14, fontWeight: 500 },
+  btnGreen: { background: '#16a34a', color: '#fff', border: 'none', borderRadius: 6, padding: '8px 16px', fontSize: 14, fontWeight: 600 },
+  section: { background: '#fff', border: '1px solid #e5e7eb', borderRadius: 8, marginBottom: 16 },
+  sectionHead: { padding: '14px 20px', borderBottom: '1px solid #f3f4f6', display: 'flex', alignItems: 'center', justifyContent: 'space-between' },
+  sectionTitle: { fontSize: 14, fontWeight: 600, color: '#111827', margin: 0 },
+  sectionTag: { fontSize: 12, padding: '2px 10px', borderRadius: 20, fontWeight: 600 },
+  sectionBody: { padding: '18px 20px' },
+  grid2: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px 24px' },
+  field: { marginBottom: 0 },
+  fieldLabel: { fontSize: 11, fontWeight: 600, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4 },
+  fieldValue: { fontSize: 14, color: '#111827', lineHeight: 1.5 },
+  reasoningBox: { background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: 6, padding: '10px 14px', marginTop: 14 },
+  reasoningLabel: { fontSize: 11, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 },
+  reasoningText: { fontSize: 13, color: '#374151', lineHeight: 1.6 },
+  countBig: { fontSize: 32, fontWeight: 700, color: '#1d4ed8', lineHeight: 1 },
+  countLabel: { fontSize: 12, color: '#6b7280', marginTop: 4 },
+  compliantYes: { background: '#dcfce7', color: '#166534', fontSize: 12, padding: '3px 12px', borderRadius: 20, fontWeight: 600, display: 'inline-block' },
+  compliantNo: { background: '#fee2e2', color: '#991b1b', fontSize: 12, padding: '3px 12px', borderRadius: 20, fontWeight: 600, display: 'inline-block' },
+  issueList: { margin: '10px 0 0', paddingLeft: 18 },
+  issueItem: { fontSize: 13, color: '#b91c1c', marginBottom: 4 },
+  navRow: { display: 'flex', gap: 8, marginTop: 4 },
+}
 
 export default function CampaignPreview() {
   const { id } = useParams()
@@ -18,8 +50,8 @@ export default function CampaignPreview() {
       .finally(() => setLoading(false))
   }, [id])
 
-  if (loading) return <LoadingState />
-  if (error) return <ErrorState error={error} />
+  if (loading) return <div style={{ textAlign: 'center', padding: '80px 0', color: '#9ca3af' }}>Loading...</div>
+  if (error) return <div style={{ textAlign: 'center', padding: '80px 0', color: '#ef4444' }}>{error}</div>
   if (!campaign) return null
 
   const strategy = campaign.strategy_json || {}
@@ -28,114 +60,123 @@ export default function CampaignPreview() {
   const compliance = campaign.compliance_json || {}
 
   return (
-    <div className="max-w-5xl mx-auto px-4 py-10">
-      {/* Header */}
-      <div className="mb-6 flex items-start justify-between">
-        <div>
-          <div className="flex items-center gap-2 text-blue-600 text-sm font-medium mb-1">
-            <button onClick={() => navigate('/')} className="hover:underline">Dashboard</button>
-            <span>/</span>
-            <span>Campaign #{id}</span>
+    <div style={S.page}>
+      <div style={S.breadcrumb}>
+        <button style={S.breadBtn} onClick={() => navigate('/')}>Campaigns</button>
+        <span>/</span>
+        <span>Campaign #{id}</span>
+      </div>
+
+      <div style={S.header}>
+        <div style={S.titleRow}>
+          <div>
+            <h1 style={S.title}>Campaign #{id}</h1>
+            <p style={S.objective}>{campaign.objective}</p>
           </div>
-          <h1 className="text-2xl font-bold text-gray-900">Campaign Preview</h1>
-          <p className="text-gray-500 text-sm mt-1 max-w-2xl">{campaign.objective}</p>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 10 }}>
+            <StatusBadge status={campaign.status} />
+            <div style={S.actions}>
+              {campaign.status === 'draft' && (
+                <button style={S.btnPrimary} onClick={() => navigate(`/campaign/${id}/approve`)}>
+                  Review & Approve
+                </button>
+              )}
+              {campaign.status === 'approved' && (
+                <button style={S.btnGreen} onClick={() => navigate(`/campaign/${id}/analytics`)}>
+                  View Analytics
+                </button>
+              )}
+              {campaign.status === 'sent' && (
+                <button style={S.btnSecondary} onClick={() => navigate(`/campaign/${id}/analytics`)}>
+                  View Analytics
+                </button>
+              )}
+            </div>
+          </div>
         </div>
-        <div className="flex items-center gap-3">
-          <StatusBadge status={campaign.status} />
-          {campaign.status === 'draft' && (
-            <button
-              onClick={() => navigate(`/campaign/${id}/approve`)}
-              className="bg-blue-700 hover:bg-blue-800 text-white text-sm font-semibold px-5 py-2 rounded-xl transition"
-            >
-              Review & Approve
-            </button>
-          )}
-          {campaign.status === 'approved' && (
-            <button
-              onClick={() => navigate(`/campaign/${id}/analytics`)}
-              className="bg-green-600 hover:bg-green-700 text-white text-sm font-semibold px-5 py-2 rounded-xl transition"
-            >
-              View Analytics
-            </button>
+      </div>
+
+      {/* Strategy */}
+      <div style={S.section}>
+        <div style={S.sectionHead}>
+          <p style={S.sectionTitle}>Strategy Agent</p>
+          <span style={{ ...S.sectionTag, background: '#dcfce7', color: '#166534' }}>Done</span>
+        </div>
+        <div style={S.sectionBody}>
+          <div style={S.grid2}>
+            <Field label="Campaign Goal" value={strategy.campaign_goal} />
+            <Field label="Tone" value={strategy.tone} />
+            <Field label="Target Persona" value={strategy.target_persona} />
+            <Field label="CTA Strategy" value={strategy.cta_strategy} />
+          </div>
+          {strategy.reasoning && (
+            <div style={S.reasoningBox}>
+              <p style={S.reasoningLabel}>Reasoning</p>
+              <p style={S.reasoningText}>{strategy.reasoning}</p>
+            </div>
           )}
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-6">
-        {/* Strategy Agent Output */}
-        <AgentCard icon="🎯" title="Strategy Agent" status="done">
-          <div className="grid grid-cols-2 gap-4 text-sm">
-            <Field label="Campaign Goal" value={strategy.campaign_goal} />
-            <Field label="Tone" value={strategy.tone} />
-            <Field label="Target Persona" value={strategy.target_persona} fullWidth />
-            <Field label="CTA Strategy" value={strategy.cta_strategy} fullWidth />
-          </div>
-          {strategy.reasoning && (
-            <div className="mt-4 bg-blue-50 border border-blue-100 rounded-lg p-3">
-              <p className="text-xs font-semibold text-blue-700 mb-1">Agent Reasoning</p>
-              <p className="text-xs text-blue-800">{strategy.reasoning}</p>
+      {/* Segmentation */}
+      <div style={S.section}>
+        <div style={S.sectionHead}>
+          <p style={S.sectionTitle}>Segmentation Agent</p>
+          <span style={{ ...S.sectionTag, background: '#dcfce7', color: '#166534' }}>Done</span>
+        </div>
+        <div style={S.sectionBody}>
+          <div style={{ display: 'flex', gap: 32, alignItems: 'flex-start' }}>
+            <div>
+              <p style={S.countBig}>{seg.selected_user_count ?? '—'}</p>
+              <p style={S.countLabel}>Users selected</p>
             </div>
-          )}
-        </AgentCard>
-
-        {/* Segmentation Agent Output */}
-        <AgentCard icon="👥" title="Segmentation Agent" status="done">
-          <div className="grid grid-cols-3 gap-4 text-sm mb-3">
-            <div className="bg-blue-50 rounded-lg p-4 text-center">
-              <p className="text-3xl font-bold text-blue-700">{seg.selected_user_count ?? '—'}</p>
-              <p className="text-xs text-blue-600 font-medium mt-1">Users Selected</p>
-            </div>
-            <div className="col-span-2">
+            <div style={{ flex: 1 }}>
               <Field label="Filters Applied" value={seg.filters_applied} />
             </div>
           </div>
           {seg.reasoning && (
-            <div className="bg-blue-50 border border-blue-100 rounded-lg p-3">
-              <p className="text-xs font-semibold text-blue-700 mb-1">Segmentation Reasoning</p>
-              <p className="text-xs text-blue-800">{seg.reasoning}</p>
+            <div style={{ ...S.reasoningBox, marginTop: 14 }}>
+              <p style={S.reasoningLabel}>Reasoning</p>
+              <p style={S.reasoningText}>{seg.reasoning}</p>
             </div>
           )}
-        </AgentCard>
-
-        {/* Compliance Agent Output */}
-        <AgentCard icon="🛡️" title="Compliance Agent" status={compliance.is_compliant ? 'done' : 'error'}>
-          <div className="flex items-center gap-3 mb-3">
-            <span className={`text-sm font-bold px-3 py-1 rounded-full ${
-              compliance.is_compliant
-                ? 'bg-green-100 text-green-700'
-                : 'bg-red-100 text-red-700'
-            }`}>
-              {compliance.is_compliant ? '✓ COMPLIANT' : '✗ NON-COMPLIANT'}
-            </span>
-          </div>
-          {compliance.issues_found?.length > 0 && (
-            <div className="mb-2">
-              <p className="text-xs font-semibold text-red-600 mb-1">Issues Found:</p>
-              <ul className="text-xs text-red-700 list-disc pl-4 space-y-0.5">
-                {compliance.issues_found.map((issue, i) => <li key={i}>{issue}</li>)}
-              </ul>
-            </div>
-          )}
-          {compliance.issues_found?.length === 0 && (
-            <p className="text-xs text-green-700">No compliance issues detected. Email meets all BFSI regulatory guidelines.</p>
-          )}
-        </AgentCard>
+        </div>
       </div>
 
-      {/* Navigation */}
-      <div className="mt-6 flex gap-3">
-        <button
-          onClick={() => navigate(`/campaign/${id}/email`)}
-          className="bg-white border border-gray-300 hover:border-blue-400 text-gray-700 hover:text-blue-700 text-sm font-medium px-5 py-2.5 rounded-xl transition"
-        >
+      {/* Compliance */}
+      <div style={S.section}>
+        <div style={S.sectionHead}>
+          <p style={S.sectionTitle}>Compliance Agent</p>
+          <span style={{
+            ...S.sectionTag,
+            background: compliance.is_compliant ? '#dcfce7' : '#fee2e2',
+            color: compliance.is_compliant ? '#166534' : '#991b1b',
+          }}>
+            {compliance.is_compliant ? 'Passed' : 'Failed'}
+          </span>
+        </div>
+        <div style={S.sectionBody}>
+          <span style={compliance.is_compliant ? S.compliantYes : S.compliantNo}>
+            {compliance.is_compliant ? 'Compliant — meets RBI/SEBI/IRDAI guidelines' : 'Non-Compliant'}
+          </span>
+          {compliance.issues_found?.length > 0 && (
+            <ul style={S.issueList}>
+              {compliance.issues_found.map((issue, i) => (
+                <li key={i} style={S.issueItem}>{issue}</li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </div>
+
+      {/* Bottom nav */}
+      <div style={S.navRow}>
+        <button style={S.btnSecondary} onClick={() => navigate(`/campaign/${id}/email`)}>
           View Email Content
         </button>
         {campaign.status === 'draft' && (
-          <button
-            onClick={() => navigate(`/campaign/${id}/approve`)}
-            className="bg-blue-700 hover:bg-blue-800 text-white text-sm font-semibold px-5 py-2.5 rounded-xl transition"
-          >
-            Go to Approval Dashboard
+          <button style={S.btnPrimary} onClick={() => navigate(`/campaign/${id}/approve`)}>
+            Go to Approval
           </button>
         )}
       </div>
@@ -143,34 +184,11 @@ export default function CampaignPreview() {
   )
 }
 
-function Field({ label, value, fullWidth }) {
+function Field({ label, value }) {
   return (
-    <div className={fullWidth ? 'col-span-2' : ''}>
-      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">{label}</p>
-      <p className="text-sm text-gray-800">{value || '—'}</p>
-    </div>
-  )
-}
-
-function LoadingState() {
-  return (
-    <div className="max-w-5xl mx-auto px-4 py-20 text-center">
-      <div className="inline-flex items-center gap-3 text-gray-500">
-        <svg className="animate-spin w-6 h-6 text-blue-600" fill="none" viewBox="0 0 24 24">
-          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
-          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"/>
-        </svg>
-        <span className="text-lg font-medium">Loading campaign data...</span>
-      </div>
-    </div>
-  )
-}
-
-function ErrorState({ error }) {
-  return (
-    <div className="max-w-5xl mx-auto px-4 py-20 text-center">
-      <p className="text-red-600 font-semibold text-lg">Failed to load campaign</p>
-      <p className="text-gray-500 text-sm mt-1">{error}</p>
+    <div style={{ marginBottom: 4 }}>
+      <p style={{ fontSize: 11, fontWeight: 600, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4 }}>{label}</p>
+      <p style={{ fontSize: 14, color: '#111827', lineHeight: 1.5, margin: 0 }}>{value || '—'}</p>
     </div>
   )
 }

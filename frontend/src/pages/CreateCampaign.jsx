@@ -2,12 +2,39 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { createCampaign, seedUsers } from '../api/client'
 
-const EXAMPLE_OBJECTIVES = [
-  'Promote our new home loan product targeting salaried professionals in Maharashtra with competitive interest rates',
-  'Launch a term insurance awareness campaign for working professionals aged 25-40 across metro cities in India',
-  'Drive credit card applications among high-income IT professionals in Bangalore and Hyderabad',
-  'Promote our mutual fund SIP plans targeting first-time investors with monthly income above ₹50,000',
+const EXAMPLES = [
+  'Promote a new home loan product targeting salaried professionals in Maharashtra with competitive interest rates.',
+  'Launch a term insurance awareness campaign for working professionals aged 25–40 across metro cities in India.',
+  'Drive credit card applications among high-income IT professionals in Bangalore and Hyderabad.',
+  'Promote mutual fund SIP plans targeting first-time investors with monthly income above ₹50,000.',
 ]
+
+const S = {
+  page: { maxWidth: 680, margin: '0 auto', padding: '40px 24px' },
+  back: { fontSize: 13, color: '#6b7280', marginBottom: 24, display: 'flex', alignItems: 'center', gap: 4 },
+  backBtn: { background: 'none', border: 'none', padding: 0, color: '#6b7280', fontSize: 13, cursor: 'pointer' },
+  title: { fontSize: 22, fontWeight: 700, color: '#111827', margin: '0 0 6px' },
+  subtitle: { fontSize: 14, color: '#6b7280', margin: '0 0 28px' },
+  seedBox: { background: '#fffbeb', border: '1px solid #fcd34d', borderRadius: 8, padding: '14px 16px', marginBottom: 24, display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16 },
+  seedText: { fontSize: 13, color: '#92400e', fontWeight: 600, marginBottom: 2 },
+  seedSub: { fontSize: 12, color: '#b45309' },
+  seedMsg: { fontSize: 12, color: '#166534', marginTop: 4 },
+  seedBtn: { background: '#f59e0b', color: '#fff', border: 'none', borderRadius: 6, padding: '7px 14px', fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', flexShrink: 0 },
+  card: { background: '#fff', border: '1px solid #e5e7eb', borderRadius: 8, padding: 24 },
+  label: { display: 'block', fontSize: 14, fontWeight: 600, color: '#374151', marginBottom: 8 },
+  textarea: { width: '100%', border: '1px solid #d1d5db', borderRadius: 6, padding: '10px 12px', fontSize: 14, color: '#111827', resize: 'vertical', outline: 'none', boxSizing: 'border-box', lineHeight: 1.6 },
+  charCount: { fontSize: 12, color: '#9ca3af', marginTop: 6, marginBottom: 20 },
+  exLabel: { fontSize: 12, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 10 },
+  exBtn: { display: 'block', width: '100%', textAlign: 'left', background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: 6, padding: '8px 12px', fontSize: 13, color: '#374151', marginBottom: 6, cursor: 'pointer' },
+  error: { background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 6, padding: '10px 14px', fontSize: 13, color: '#b91c1c', marginTop: 16 },
+  submit: { width: '100%', background: '#1d4ed8', color: '#fff', border: 'none', borderRadius: 6, padding: '11px 0', fontSize: 15, fontWeight: 600, marginTop: 20, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 },
+  submitDisabled: { opacity: 0.5, cursor: 'not-allowed' },
+  pipeline: { marginTop: 28, background: '#fff', border: '1px solid #e5e7eb', borderRadius: 8, padding: '18px 20px' },
+  pipelineTitle: { fontSize: 12, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 14 },
+  pipelineRow: { display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
+  pipelineStep: { background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: 6, padding: '6px 14px', fontSize: 13, color: '#374151' },
+  pipelineArrow: { color: '#9ca3af', fontSize: 14 },
+}
 
 export default function CreateCampaign() {
   const [objective, setObjective] = useState('')
@@ -26,7 +53,7 @@ export default function CreateCampaign() {
       const res = await createCampaign(objective.trim())
       navigate(`/campaign/${res.data.campaign_id}/preview`)
     } catch (err) {
-      setError(err.response?.data?.detail || err.message || 'Unknown error')
+      setError(err.response?.data?.detail || err.message || 'Something went wrong.')
     } finally {
       setLoading(false)
     }
@@ -45,112 +72,74 @@ export default function CreateCampaign() {
     }
   }
 
+  const disabled = loading || objective.trim().length < 10
+
   return (
-    <div className="max-w-3xl mx-auto px-4 py-10">
-      {/* Header */}
-      <div className="mb-8">
-        <div className="flex items-center gap-2 text-blue-600 text-sm font-medium mb-2">
-          <span>Dashboard</span>
-          <span>/</span>
-          <span>New Campaign</span>
-        </div>
-        <h1 className="text-3xl font-bold text-gray-900">Create Email Campaign</h1>
-        <p className="text-gray-500 mt-1">
-          Describe your campaign objective in plain English. Our multi-agent AI will plan, write, and validate the campaign for you.
-        </p>
+    <div style={S.page}>
+      <div style={S.back}>
+        <button style={S.backBtn} onClick={() => navigate('/')}>Campaigns</button>
+        <span>/</span>
+        <span>New Campaign</span>
       </div>
 
-      {/* Seed Banner */}
-      <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-6 flex items-start justify-between gap-4">
+      <h1 style={S.title}>New Campaign</h1>
+      <p style={S.subtitle}>
+        Describe your objective in plain English. The AI agents will plan, write, and validate the campaign automatically.
+      </p>
+
+      {/* Seed users notice */}
+      <div style={S.seedBox}>
         <div>
-          <p className="text-sm font-semibold text-amber-800">First time? Seed demo users</p>
-          <p className="text-xs text-amber-700 mt-0.5">Load 30 sample Indian BFSI users into the database for segmentation testing.</p>
-          {seedMsg && <p className="text-xs mt-1 text-green-700 font-medium">{seedMsg}</p>}
+          <p style={S.seedText}>First time? Seed demo users</p>
+          <p style={S.seedSub}>Loads 30 sample Indian BFSI users for segmentation.</p>
+          {seedMsg && <p style={S.seedMsg}>{seedMsg}</p>}
         </div>
-        <button
-          onClick={handleSeed}
-          disabled={seedLoading}
-          className="shrink-0 bg-amber-500 hover:bg-amber-600 text-white text-sm font-medium px-4 py-2 rounded-lg transition disabled:opacity-60"
-        >
+        <button style={S.seedBtn} onClick={handleSeed} disabled={seedLoading}>
           {seedLoading ? 'Seeding...' : 'Seed Users'}
         </button>
       </div>
 
-      {/* Main Form */}
-      <form onSubmit={handleSubmit} className="bg-white rounded-2xl border border-gray-200 shadow-sm p-8">
-        <label className="block text-sm font-semibold text-gray-700 mb-2">
-          Campaign Objective
-          <span className="text-red-500 ml-1">*</span>
+      {/* Form */}
+      <form onSubmit={handleSubmit} style={S.card}>
+        <label style={S.label}>
+          Campaign Objective <span style={{ color: '#ef4444' }}>*</span>
         </label>
         <textarea
           value={objective}
           onChange={(e) => setObjective(e.target.value)}
           rows={5}
-          placeholder="e.g. Promote our new home loan product targeting salaried professionals in Maharashtra..."
-          className="w-full border border-gray-300 rounded-xl p-4 text-gray-800 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none resize-none transition"
+          placeholder="e.g. Promote a new home loan product targeting salaried professionals in Maharashtra..."
+          style={S.textarea}
         />
-        <p className="text-xs text-gray-400 mt-1">{objective.length} characters — minimum 10 required</p>
+        <p style={S.charCount}>{objective.length} characters — minimum 10</p>
 
-        {/* Example Prompts */}
-        <div className="mt-5">
-          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Example objectives</p>
-          <div className="grid gap-2">
-            {EXAMPLE_OBJECTIVES.map((ex, i) => (
-              <button
-                key={i}
-                type="button"
-                onClick={() => setObjective(ex)}
-                className="text-left text-xs text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-lg px-3 py-2 transition"
-              >
-                {ex}
-              </button>
-            ))}
-          </div>
-        </div>
+        <p style={S.exLabel}>Example objectives</p>
+        {EXAMPLES.map((ex, i) => (
+          <button key={i} type="button" style={S.exBtn} onClick={() => setObjective(ex)}>
+            {ex}
+          </button>
+        ))}
 
-        {error && (
-          <div className="mt-4 bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-700">
-            <strong>Error:</strong> {error}
-          </div>
-        )}
+        {error && <div style={S.error}>{error}</div>}
 
         <button
           type="submit"
-          disabled={loading || objective.trim().length < 10}
-          className="mt-6 w-full bg-blue-700 hover:bg-blue-800 text-white font-semibold py-3 px-6 rounded-xl text-sm transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+          disabled={disabled}
+          style={{ ...S.submit, ...(disabled ? S.submitDisabled : {}) }}
         >
-          {loading ? (
-            <>
-              <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"/>
-              </svg>
-              Running AI Agents (this takes ~30–60s)...
-            </>
-          ) : (
-            'Launch Multi-Agent Pipeline'
-          )}
+          {loading ? 'Running AI agents — please wait...' : 'Run Campaign Pipeline'}
         </button>
       </form>
 
-      {/* Agent Flow Diagram */}
-      <div className="mt-8 bg-gray-50 rounded-2xl border border-gray-200 p-6">
-        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-4">Agent Pipeline</p>
-        <div className="flex items-center gap-2 flex-wrap">
-          {[
-            { icon: '🎯', label: 'Strategy Agent' },
-            { icon: '✍️', label: 'Content Agent' },
-            { icon: '🛡️', label: 'Compliance Agent' },
-            { icon: '👥', label: 'Segmentation Agent' },
-            { icon: '👤', label: 'Human Approval' },
-          ].map((step, i, arr) => (
-            <div key={i} className="flex items-center gap-2">
-              <div className="bg-white border border-gray-200 rounded-lg px-3 py-2 text-center shadow-xs">
-                <p className="text-lg">{step.icon}</p>
-                <p className="text-xs text-gray-600 font-medium">{step.label}</p>
-              </div>
-              {i < arr.length - 1 && <span className="text-gray-400 font-bold">→</span>}
-            </div>
+      {/* Pipeline steps */}
+      <div style={S.pipeline}>
+        <p style={S.pipelineTitle}>What happens when you submit</p>
+        <div style={S.pipelineRow}>
+          {['Strategy Agent', 'Content Agent', 'Compliance Agent', 'Segmentation Agent', 'Human Approval'].map((step, i, arr) => (
+            <span key={i} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={S.pipelineStep}>{step}</span>
+              {i < arr.length - 1 && <span style={S.pipelineArrow}>→</span>}
+            </span>
           ))}
         </div>
       </div>

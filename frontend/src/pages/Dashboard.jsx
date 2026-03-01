@@ -3,6 +3,25 @@ import { useNavigate } from 'react-router-dom'
 import { listCampaigns } from '../api/client'
 import StatusBadge from '../components/StatusBadge'
 
+const S = {
+  page: { maxWidth: 1000, margin: '0 auto', padding: '32px 24px' },
+  header: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 28 },
+  title: { fontSize: 22, fontWeight: 700, color: '#111827', margin: 0 },
+  subtitle: { fontSize: 14, color: '#6b7280', marginTop: 4 },
+  stats: { display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 28 },
+  statBox: { background: '#fff', border: '1px solid #e5e7eb', borderRadius: 8, padding: '14px 16px', textAlign: 'center' },
+  statNum: { fontSize: 26, fontWeight: 700, margin: 0 },
+  statLabel: { fontSize: 12, color: '#9ca3af', marginTop: 2 },
+  table: { width: '100%', background: '#fff', border: '1px solid #e5e7eb', borderRadius: 8, borderCollapse: 'collapse', overflow: 'hidden' },
+  th: { padding: '10px 16px', fontSize: 12, fontWeight: 600, color: '#6b7280', textAlign: 'left', background: '#f9fafb', borderBottom: '1px solid #e5e7eb', textTransform: 'uppercase', letterSpacing: '0.05em' },
+  td: { padding: '12px 16px', fontSize: 14, color: '#374151', borderBottom: '1px solid #f3f4f6', verticalAlign: 'middle' },
+  trHover: { cursor: 'pointer' },
+  btn: { background: '#1d4ed8', color: '#fff', border: 'none', borderRadius: 6, padding: '8px 16px', fontSize: 14, fontWeight: 600 },
+  btnSm: { background: '#f3f4f6', color: '#374151', border: 'none', borderRadius: 5, padding: '5px 10px', fontSize: 12, fontWeight: 500, marginLeft: 4 },
+  btnSmPrimary: { background: '#1d4ed8', color: '#fff', border: 'none', borderRadius: 5, padding: '5px 10px', fontSize: 12, fontWeight: 500, marginLeft: 4 },
+  empty: { textAlign: 'center', padding: '60px 24px', color: '#6b7280' },
+}
+
 export default function Dashboard() {
   const [campaigns, setCampaigns] = useState([])
   const [loading, setLoading] = useState(true)
@@ -14,120 +33,97 @@ export default function Dashboard() {
       .finally(() => setLoading(false))
   }, [])
 
+  const counts = {
+    total: campaigns.length,
+    draft: campaigns.filter(c => c.status === 'draft').length,
+    approved: campaigns.filter(c => c.status === 'approved').length,
+    sent: campaigns.filter(c => c.status === 'sent').length,
+  }
+
   return (
-    <div className="max-w-5xl mx-auto px-4 py-10">
-      {/* Header */}
-      <div className="flex items-start justify-between mb-8">
+    <div style={S.page}>
+      <div style={S.header}>
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Campaign Dashboard</h1>
-          <p className="text-gray-500 mt-1">Manage and monitor your BFSI email marketing campaigns.</p>
+          <h1 style={S.title}>Campaigns</h1>
+          <p style={S.subtitle}>BFSI email marketing campaigns managed by the AI pipeline.</p>
         </div>
-        <button
-          onClick={() => navigate('/create')}
-          className="bg-blue-700 hover:bg-blue-800 text-white text-sm font-semibold px-5 py-2.5 rounded-xl transition"
-        >
-          + New Campaign
+        <button style={S.btn} onClick={() => navigate('/create')}>
+          New Campaign
         </button>
       </div>
 
-      {/* Stats bar */}
-      <div className="grid grid-cols-4 gap-4 mb-8">
+      <div style={S.stats}>
         {[
-          { label: 'Total', value: campaigns.length, color: 'text-gray-700' },
-          { label: 'Draft', value: campaigns.filter(c => c.status === 'draft').length, color: 'text-yellow-600' },
-          { label: 'Approved', value: campaigns.filter(c => c.status === 'approved').length, color: 'text-green-600' },
-          { label: 'Sent', value: campaigns.filter(c => c.status === 'sent').length, color: 'text-blue-600' },
-        ].map((stat) => (
-          <div key={stat.label} className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 text-center">
-            <p className={`text-3xl font-bold ${stat.color}`}>{stat.value}</p>
-            <p className="text-xs text-gray-400 font-medium mt-1">{stat.label}</p>
+          { label: 'Total', value: counts.total, color: '#111827' },
+          { label: 'Draft', value: counts.draft, color: '#92400e' },
+          { label: 'Approved', value: counts.approved, color: '#166534' },
+          { label: 'Sent', value: counts.sent, color: '#1e40af' },
+        ].map((s) => (
+          <div key={s.label} style={S.statBox}>
+            <p style={{ ...S.statNum, color: s.color }}>{s.value}</p>
+            <p style={S.statLabel}>{s.label}</p>
           </div>
         ))}
       </div>
 
-      {/* Campaigns List */}
       {loading ? (
-        <div className="flex justify-center py-20">
-          <svg className="animate-spin w-8 h-8 text-blue-600" fill="none" viewBox="0 0 24 24">
-            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
-            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"/>
-          </svg>
-        </div>
+        <div style={{ textAlign: 'center', padding: '60px 0', color: '#9ca3af' }}>Loading...</div>
       ) : campaigns.length === 0 ? (
-        <div className="bg-white rounded-2xl border border-dashed border-gray-300 p-16 text-center">
-          <p className="text-5xl mb-4">📧</p>
-          <p className="text-lg font-semibold text-gray-600">No campaigns yet</p>
-          <p className="text-gray-400 text-sm mt-1 mb-6">Create your first BFSI email campaign using the AI pipeline.</p>
-          <button
-            onClick={() => navigate('/create')}
-            className="bg-blue-700 hover:bg-blue-800 text-white text-sm font-semibold px-6 py-2.5 rounded-xl transition"
-          >
-            Create Campaign
-          </button>
+        <div style={{ ...S.table, ...S.empty }}>
+          <p style={{ fontSize: 16, fontWeight: 600, marginBottom: 8 }}>No campaigns yet</p>
+          <p style={{ fontSize: 14, marginBottom: 20 }}>Create your first campaign using the AI pipeline.</p>
+          <button style={S.btn} onClick={() => navigate('/create')}>Create Campaign</button>
         </div>
       ) : (
-        <div className="space-y-3">
-          {campaigns.map((c) => (
-            <div
-              key={c.id}
-              className="bg-white rounded-xl border border-gray-200 shadow-sm p-5 flex items-center justify-between hover:border-blue-300 hover:shadow-md transition cursor-pointer"
-              onClick={() => navigate(`/campaign/${c.id}/preview`)}
-            >
-              <div className="flex-1 min-w-0 mr-4">
-                <div className="flex items-center gap-2 mb-1">
-                  <span className="text-xs text-gray-400 font-mono">#{c.id}</span>
-                  <StatusBadge status={c.status} />
-                </div>
-                <p className="text-sm font-semibold text-gray-800 truncate">{c.objective}</p>
-                {c.email_json?.subject_line && (
-                  <p className="text-xs text-gray-400 mt-0.5 truncate">
-                    Subject: {c.email_json.subject_line}
-                  </p>
-                )}
-              </div>
-              <div className="flex items-center gap-3 shrink-0">
-                <p className="text-xs text-gray-400">
-                  {c.created_at ? new Date(c.created_at).toLocaleDateString('en-IN') : ''}
-                </p>
-                <div className="flex gap-1">
-                  <ActionBtn
-                    label="Preview"
-                    onClick={(e) => { e.stopPropagation(); navigate(`/campaign/${c.id}/preview`) }}
-                  />
+        <table style={S.table}>
+          <thead>
+            <tr>
+              <th style={S.th}>#</th>
+              <th style={S.th}>Objective</th>
+              <th style={S.th}>Subject</th>
+              <th style={S.th}>Status</th>
+              <th style={S.th}>Date</th>
+              <th style={S.th}>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {campaigns.map((c) => (
+              <tr
+                key={c.id}
+                style={S.trHover}
+                onClick={() => navigate(`/campaign/${c.id}/preview`)}
+                onMouseEnter={e => e.currentTarget.style.background = '#f9fafb'}
+                onMouseLeave={e => e.currentTarget.style.background = ''}
+              >
+                <td style={{ ...S.td, color: '#9ca3af', width: 40 }}>{c.id}</td>
+                <td style={{ ...S.td, maxWidth: 280 }}>
+                  <span style={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {c.objective}
+                  </span>
+                </td>
+                <td style={{ ...S.td, maxWidth: 200, color: '#6b7280' }}>
+                  <span style={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {c.email_json?.subject_line || '—'}
+                  </span>
+                </td>
+                <td style={S.td}><StatusBadge status={c.status} /></td>
+                <td style={{ ...S.td, whiteSpace: 'nowrap', color: '#6b7280' }}>
+                  {c.created_at ? new Date(c.created_at).toLocaleDateString('en-IN') : '—'}
+                </td>
+                <td style={S.td} onClick={e => e.stopPropagation()}>
+                  <button style={S.btnSm} onClick={() => navigate(`/campaign/${c.id}/preview`)}>Preview</button>
                   {c.status === 'draft' && (
-                    <ActionBtn
-                      label="Approve"
-                      primary
-                      onClick={(e) => { e.stopPropagation(); navigate(`/campaign/${c.id}/approve`) }}
-                    />
+                    <button style={S.btnSmPrimary} onClick={() => navigate(`/campaign/${c.id}/approve`)}>Approve</button>
                   )}
                   {(c.status === 'approved' || c.status === 'sent') && (
-                    <ActionBtn
-                      label="Analytics"
-                      onClick={(e) => { e.stopPropagation(); navigate(`/campaign/${c.id}/analytics`) }}
-                    />
+                    <button style={S.btnSm} onClick={() => navigate(`/campaign/${c.id}/analytics`)}>Analytics</button>
                   )}
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       )}
     </div>
-  )
-}
-
-function ActionBtn({ label, onClick, primary }) {
-  return (
-    <button
-      onClick={onClick}
-      className={`text-xs font-medium px-3 py-1.5 rounded-lg transition ${
-        primary
-          ? 'bg-blue-700 hover:bg-blue-800 text-white'
-          : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
-      }`}
-    >
-      {label}
-    </button>
   )
 }

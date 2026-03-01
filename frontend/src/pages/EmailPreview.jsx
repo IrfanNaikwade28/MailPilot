@@ -2,6 +2,33 @@ import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { getCampaign } from '../api/client'
 
+const S = {
+  page: { maxWidth: 860, margin: '0 auto', padding: '32px 24px' },
+  breadcrumb: { fontSize: 13, color: '#6b7280', marginBottom: 20, display: 'flex', alignItems: 'center', gap: 6 },
+  breadBtn: { background: 'none', border: 'none', padding: 0, color: '#6b7280', fontSize: 13, cursor: 'pointer' },
+  title: { fontSize: 22, fontWeight: 700, color: '#111827', margin: '0 0 24px' },
+  layout: { display: 'grid', gridTemplateColumns: '1fr 280px', gap: 20 },
+  emailCard: { background: '#fff', border: '1px solid #e5e7eb', borderRadius: 8, overflow: 'hidden' },
+  emailBar: { background: '#f3f4f6', borderBottom: '1px solid #e5e7eb', padding: '10px 16px', display: 'flex', alignItems: 'center', gap: 8 },
+  dot: (color) => ({ width: 10, height: 10, borderRadius: '50%', background: color }),
+  emailBarLabel: { fontSize: 12, color: '#9ca3af', marginLeft: 6 },
+  emailBody: { padding: '24px 28px' },
+  subjectLabel: { fontSize: 11, fontWeight: 600, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 },
+  subjectText: { fontSize: 18, fontWeight: 700, color: '#111827', marginBottom: 20, paddingBottom: 16, borderBottom: '1px solid #f3f4f6' },
+  bodyText: { fontSize: 14, color: '#374151', lineHeight: 1.8, whiteSpace: 'pre-wrap' },
+  ctaBtn: { display: 'inline-block', background: '#1d4ed8', color: '#fff', padding: '10px 24px', borderRadius: 6, fontSize: 14, fontWeight: 600, marginTop: 20, border: 'none' },
+  disclaimer: { fontSize: 12, color: '#9ca3af', lineHeight: 1.6, marginTop: 24, paddingTop: 16, borderTop: '1px solid #f3f4f6' },
+  sidebar: { display: 'flex', flexDirection: 'column', gap: 12 },
+  infoCard: { background: '#fff', border: '1px solid #e5e7eb', borderRadius: 8, padding: '16px' },
+  infoTitle: { fontSize: 12, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 12 },
+  infoRow: { marginBottom: 12 },
+  infoLabel: { fontSize: 11, color: '#9ca3af', marginBottom: 3, fontWeight: 600 },
+  infoValue: { fontSize: 13, color: '#111827' },
+  noteBox: { background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 8, padding: '12px 14px' },
+  noteText: { fontSize: 12, color: '#166534', lineHeight: 1.6 },
+  proceedBtn: { background: '#1d4ed8', color: '#fff', border: 'none', borderRadius: 6, padding: '10px 0', fontSize: 14, fontWeight: 600, width: '100%', cursor: 'pointer' },
+}
+
 export default function EmailPreview() {
   const { id } = useParams()
   const navigate = useNavigate()
@@ -14,114 +41,79 @@ export default function EmailPreview() {
       .finally(() => setLoading(false))
   }, [id])
 
-  if (loading) return (
-    <div className="flex items-center justify-center py-32">
-      <svg className="animate-spin w-8 h-8 text-blue-600" fill="none" viewBox="0 0 24 24">
-        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
-        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"/>
-      </svg>
-    </div>
-  )
+  if (loading) return <div style={{ textAlign: 'center', padding: '80px 0', color: '#9ca3af' }}>Loading...</div>
   if (!campaign) return null
 
   const email = campaign.email_json || {}
+  const wordCount = (email.email_body || '').split(/\s+/).filter(Boolean).length
 
   return (
-    <div className="max-w-4xl mx-auto px-4 py-10">
-      {/* Breadcrumb */}
-      <div className="flex items-center gap-2 text-blue-600 text-sm font-medium mb-4">
-        <button onClick={() => navigate('/')} className="hover:underline">Dashboard</button>
+    <div style={S.page}>
+      <div style={S.breadcrumb}>
+        <button style={S.breadBtn} onClick={() => navigate('/')}>Campaigns</button>
         <span>/</span>
-        <button onClick={() => navigate(`/campaign/${id}/preview`)} className="hover:underline">Campaign #{id}</button>
+        <button style={S.breadBtn} onClick={() => navigate(`/campaign/${id}/preview`)}>Campaign #{id}</button>
         <span>/</span>
         <span>Email Preview</span>
       </div>
 
-      <h1 className="text-2xl font-bold text-gray-900 mb-6">Email Preview — Content Agent Output</h1>
+      <h1 style={S.title}>Email Preview</h1>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Email Renderer */}
-        <div className="lg:col-span-2">
-          <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-            {/* Email Client Toolbar */}
-            <div className="bg-gray-100 border-b border-gray-200 px-5 py-3 flex items-center gap-2">
-              <div className="flex gap-1.5">
-                <div className="w-3 h-3 rounded-full bg-red-400"/>
-                <div className="w-3 h-3 rounded-full bg-yellow-400"/>
-                <div className="w-3 h-3 rounded-full bg-green-400"/>
-              </div>
-              <p className="text-xs text-gray-500 ml-2 font-medium">Email Preview</p>
-            </div>
-            {/* Email Content */}
-            <div className="p-6">
-              <div className="border-b border-gray-100 pb-4 mb-4">
-                <p className="text-xs text-gray-400 font-medium uppercase tracking-wide">Subject</p>
-                <p className="text-base font-bold text-gray-900 mt-1">{email.subject_line || '—'}</p>
-              </div>
-              <div className="prose prose-sm max-w-none text-gray-700 leading-relaxed whitespace-pre-wrap text-sm">
-                {email.email_body || '—'}
-              </div>
-              {email.cta_text && (
-                <div className="mt-6">
-                  <button className="bg-blue-700 text-white text-sm font-semibold px-8 py-3 rounded-lg shadow">
-                    {email.cta_text}
-                  </button>
-                </div>
-              )}
-              {email.disclaimer && (
-                <div className="mt-6 pt-4 border-t border-gray-100">
-                  <p className="text-xs text-gray-400 leading-relaxed">{email.disclaimer}</p>
-                </div>
-              )}
-            </div>
+      <div style={S.layout}>
+        {/* Email render */}
+        <div style={S.emailCard}>
+          <div style={S.emailBar}>
+            <span style={S.dot('#f87171')} />
+            <span style={S.dot('#fbbf24')} />
+            <span style={S.dot('#4ade80')} />
+            <span style={S.emailBarLabel}>Email Preview</span>
+          </div>
+          <div style={S.emailBody}>
+            <p style={S.subjectLabel}>Subject</p>
+            <p style={S.subjectText}>{email.subject_line || '—'}</p>
+            <p style={S.bodyText}>{email.email_body || '—'}</p>
+            {email.cta_text && (
+              <button style={S.ctaBtn}>{email.cta_text}</button>
+            )}
+            {email.disclaimer && (
+              <p style={S.disclaimer}>{email.disclaimer}</p>
+            )}
           </div>
         </div>
 
-        {/* Sidebar: Field Breakdown */}
-        <div className="space-y-4">
-          <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
-            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-4">Email Fields</p>
-            <div className="space-y-4">
-              <FieldBox label="Subject Line" value={email.subject_line} />
-              <FieldBox label="CTA Text" value={email.cta_text} highlight />
-              <div>
-                <p className="text-xs font-semibold text-gray-500 mb-1">Email Body</p>
-                <p className="text-xs text-gray-500">{(email.email_body || '').split(' ').length} words</p>
-              </div>
-              <div>
-                <p className="text-xs font-semibold text-gray-500 mb-1">Disclaimer</p>
-                <p className="text-xs text-gray-500 italic">{email.disclaimer ? 'Present' : 'Missing'}</p>
-              </div>
+        {/* Sidebar */}
+        <div style={S.sidebar}>
+          <div style={S.infoCard}>
+            <p style={S.infoTitle}>Email Details</p>
+            <div style={S.infoRow}>
+              <p style={S.infoLabel}>Subject Line</p>
+              <p style={S.infoValue}>{email.subject_line || '—'}</p>
+            </div>
+            <div style={S.infoRow}>
+              <p style={S.infoLabel}>CTA Text</p>
+              <p style={{ ...S.infoValue, color: '#1d4ed8', fontWeight: 600 }}>{email.cta_text || '—'}</p>
+            </div>
+            <div style={S.infoRow}>
+              <p style={S.infoLabel}>Body Length</p>
+              <p style={S.infoValue}>{wordCount} words</p>
+            </div>
+            <div style={S.infoRow}>
+              <p style={S.infoLabel}>Disclaimer</p>
+              <p style={S.infoValue}>{email.disclaimer ? 'Present' : 'Missing'}</p>
             </div>
           </div>
 
-          <div className="bg-green-50 border border-green-200 rounded-xl p-4">
-            <p className="text-xs font-semibold text-green-700 mb-2">Content Agent</p>
-            <p className="text-xs text-green-700">
-              This email was generated by the Content Agent using the campaign strategy as input.
-              It has been reviewed by the Compliance Agent for BFSI regulatory adherence.
+          <div style={S.noteBox}>
+            <p style={S.noteText}>
+              This email was generated by the Content Agent and reviewed by the Compliance Agent for BFSI regulatory adherence.
             </p>
           </div>
 
-          <button
-            onClick={() => navigate(`/campaign/${id}/approve`)}
-            className="w-full bg-blue-700 hover:bg-blue-800 text-white text-sm font-semibold py-3 rounded-xl transition"
-          >
+          <button style={S.proceedBtn} onClick={() => navigate(`/campaign/${id}/approve`)}>
             Proceed to Approval
           </button>
         </div>
       </div>
-    </div>
-  )
-}
-
-function FieldBox({ label, value, highlight }) {
-  return (
-    <div>
-      <p className="text-xs font-semibold text-gray-500 mb-1">{label}</p>
-      <p className={`text-xs rounded px-2 py-1.5 ${highlight ? 'bg-blue-50 text-blue-700 font-medium' : 'text-gray-700'}`}>
-        {value || '—'}
-      </p>
     </div>
   )
 }
