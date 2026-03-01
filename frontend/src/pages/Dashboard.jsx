@@ -45,7 +45,7 @@ export default function Dashboard() {
       <div style={S.header}>
         <div>
           <h1 style={S.title}>Campaigns</h1>
-          <p style={S.subtitle}>BFSI email marketing campaigns managed by the AI pipeline.</p>
+          <p style={S.subtitle}>Email marketing campaigns managed by the AI pipeline.</p>
         </div>
         <button style={S.btn} onClick={() => navigate('/create')}>
           New Campaign

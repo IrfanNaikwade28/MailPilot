@@ -44,8 +44,30 @@ const S = {
   linkBtn: { display: 'block', background: 'none', border: 'none', padding: '5px 0', fontSize: 13, color: '#1d4ed8', cursor: 'pointer', textAlign: 'left' },
   alert: (color) => ({ background: color === 'green' ? '#f0fdf4' : '#fef2f2', border: `1px solid ${color === 'green' ? '#bbf7d0' : '#fecaca'}`, borderRadius: 6, padding: '10px 14px', fontSize: 13, color: color === 'green' ? '#166534' : '#b91c1c', marginBottom: 16 }),
   statusBox: { textAlign: 'center', padding: '16px 0' },
-  statusEmoji: { fontSize: 32, marginBottom: 10 },
-  approvedBy: { fontSize: 13, color: '#6b7280', marginTop: 8 },
+  sendTimeNote: { fontSize: 11, color: '#9ca3af', marginTop: -10, marginBottom: 12, lineHeight: 1.5 },
+}
+
+/** Convert a datetime-local string to InXiteOut format: "DD:MM:YY HH:MM:SS" IST */
+function toSendTimeFormat(localDatetimeStr) {
+  if (!localDatetimeStr) return null
+  const d = new Date(localDatetimeStr)
+  if (isNaN(d.getTime())) return null
+  // Adjust to IST (UTC+5:30)
+  const ist = new Date(d.getTime() + (5 * 60 + 30) * 60 * 1000 - d.getTimezoneOffset() * 60 * 1000)
+  const pad = (n) => String(n).padStart(2, '0')
+  const dd = pad(ist.getDate())
+  const mm = pad(ist.getMonth() + 1)
+  const yy = String(ist.getFullYear()).slice(-2)
+  const hh = pad(ist.getHours())
+  const min = pad(ist.getMinutes())
+  const ss = pad(ist.getSeconds())
+  return `${dd}:${mm}:${yy} ${hh}:${min}:${ss}`
+}
+
+/** Return the minimum datetime-local value = 5 minutes from now */
+function minSendTime() {
+  const d = new Date(Date.now() + 5 * 60 * 1000)
+  return d.toISOString().slice(0, 16)
 }
 
 export default function ApprovalDashboard() {
@@ -61,6 +83,7 @@ export default function ApprovalDashboard() {
   const [approverName, setApproverName] = useState('')
   const [rejectionReason, setRejectionReason] = useState('')
   const [showRejectForm, setShowRejectForm] = useState(false)
+  const [sendDatetime, setSendDatetime] = useState('')
 
   useEffect(() => {
     getCampaign(id)
@@ -68,6 +91,9 @@ export default function ApprovalDashboard() {
         setCampaign(res.data)
         const e = res.data.email_json || {}
         setEditData({ subject_line: e.subject_line || '', email_body: e.email_body || '', cta_text: e.cta_text || '', disclaimer: e.disclaimer || '' })
+        // Default send time = 10 minutes from now
+        const d = new Date(Date.now() + 10 * 60 * 1000)
+        setSendDatetime(d.toISOString().slice(0, 16))
       })
       .finally(() => setLoading(false))
   }, [id])
@@ -89,10 +115,11 @@ export default function ApprovalDashboard() {
   const handleApprove = async () => {
     if (!approverName.trim()) { setError('Enter your name before approving.'); return }
     setActionLoading(true); setError(null)
+    const send_time = toSendTimeFormat(sendDatetime)
     try {
-      const res = await approveCampaign(id, { approved_by: approverName, action: 'approve' })
+      const res = await approveCampaign(id, { approved_by: approverName, action: 'approve', send_time })
       setCampaign(res.data)
-      setSuccess('Campaign approved. You can now send it from Analytics.')
+      setSuccess(`Campaign approved. Scheduled for ${send_time || 'auto'}. Go to Analytics to send it.`)
     } catch (err) {
       setError(err.response?.data?.detail || err.message)
     } finally {
@@ -136,7 +163,7 @@ export default function ApprovalDashboard() {
 
       <div style={S.titleRow}>
         <div>
-          <h1 style={S.title}>Review & Approve</h1>
+          <h1 style={S.title}>Review &amp; Approve</h1>
           <p style={S.objective}>{campaign.objective}</p>
         </div>
         <StatusBadge status={campaign.status} />
@@ -216,6 +243,15 @@ export default function ApprovalDashboard() {
                 value={approverName}
                 onChange={e => setApproverName(e.target.value)}
               />
+              <label style={S.inputLabel}>Send time (IST)</label>
+              <input
+                type="datetime-local"
+                style={S.input}
+                value={sendDatetime}
+                min={minSendTime()}
+                onChange={e => setSendDatetime(e.target.value)}
+              />
+              <p style={S.sendTimeNote}>Must be a future time. Campaign will be dispatched via CampaignX API at this time.</p>
               <button style={S.approveBtn} onClick={handleApprove} disabled={actionLoading}>
                 {actionLoading ? 'Processing...' : 'Approve Campaign'}
               </button>
@@ -238,12 +274,12 @@ export default function ApprovalDashboard() {
             </div>
           ) : (
             <div style={{ ...S.approveCard, ...S.statusBox }}>
-              <div style={S.statusEmoji}>
-                {campaign.status === 'approved' ? '✅' : campaign.status === 'sent' ? '📤' : '❌'}
-              </div>
               <StatusBadge status={campaign.status} />
               {campaign.approved_by && (
-                <p style={S.approvedBy}>By: <strong>{campaign.approved_by}</strong></p>
+                <p style={{ fontSize: 13, color: '#6b7280', marginTop: 8 }}>By: <strong>{campaign.approved_by}</strong></p>
+              )}
+              {campaign.send_time && (
+                <p style={{ fontSize: 12, color: '#9ca3af', marginTop: 4 }}>Scheduled: {campaign.send_time} IST</p>
               )}
               {campaign.rejection_reason && (
                 <p style={{ fontSize: 13, color: '#dc2626', marginTop: 6 }}>{campaign.rejection_reason}</p>
@@ -252,10 +288,10 @@ export default function ApprovalDashboard() {
           )}
 
           <div style={S.linksCard}>
-            <button style={S.linkBtn} onClick={() => navigate(`/campaign/${id}/preview`)}>View strategy & segmentation →</button>
-            <button style={S.linkBtn} onClick={() => navigate(`/campaign/${id}/email`)}>View email preview →</button>
+            <button style={S.linkBtn} onClick={() => navigate(`/campaign/${id}/preview`)}>View strategy &amp; segmentation</button>
+            <button style={S.linkBtn} onClick={() => navigate(`/campaign/${id}/email`)}>View email preview</button>
             {(campaign.status === 'approved' || campaign.status === 'sent') && (
-              <button style={S.linkBtn} onClick={() => navigate(`/campaign/${id}/analytics`)}>View analytics →</button>
+              <button style={S.linkBtn} onClick={() => navigate(`/campaign/${id}/analytics`)}>View analytics</button>
             )}
           </div>
         </div>

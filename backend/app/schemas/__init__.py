@@ -3,7 +3,8 @@ from app.schemas.schemas import (
     StrategyOutput, EmailContentOutput, SegmentationOutput, ComplianceOutput,
     CampaignCreate, CampaignRead, CampaignApprove, CampaignEdit,
     CampaignPerformanceRead, CampaignAnalytics,
-    OrchestratorResult, APIResponse
+    OrchestratorResult, APIResponse,
+    OptimizationRequest, OptimizationResult,
 )
 
 __all__ = [
@@ -11,5 +12,6 @@ __all__ = [
     "StrategyOutput", "EmailContentOutput", "SegmentationOutput", "ComplianceOutput",
     "CampaignCreate", "CampaignRead", "CampaignApprove", "CampaignEdit",
     "CampaignPerformanceRead", "CampaignAnalytics",
-    "OrchestratorResult", "APIResponse"
+    "OrchestratorResult", "APIResponse",
+    "OptimizationRequest", "OptimizationResult",
 ]

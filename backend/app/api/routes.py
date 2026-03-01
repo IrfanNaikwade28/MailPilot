@@ -1,5 +1,5 @@
 """
-API Routes — all endpoints for the BFSI Multi-Agent Email Marketing System.
+API Routes — all endpoints for MailPilot.
 """
 import logging
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
@@ -8,12 +8,13 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.schemas import (
     CampaignCreate, CampaignRead, CampaignApprove, CampaignEdit,
-    CampaignAnalytics, OrchestratorResult, APIResponse, UserCreate, UserRead
+    CampaignAnalytics, OrchestratorResult, APIResponse, UserCreate, UserRead,
+    OptimizationRequest, OptimizationResult,
 )
 from app.services import (
     create_campaign, run_campaign_pipeline, get_campaign, list_campaigns,
     approve_campaign, edit_campaign_email, get_campaign_analytics,
-    simulate_send_campaign, seed_demo_users,
+    send_approved_campaign, run_optimization_loop, refresh_cohort,
 )
 from app.models.user import User
 
@@ -100,24 +101,28 @@ def send_campaign_endpoint(
     db: Session = Depends(get_db),
 ):
     """
-    Simulate sending approved campaign emails.
-    Must be approved before sending.
+    Send an approved campaign via the InXiteOut CampaignX API.
+    Must be approved before sending. Fetches real open/click metrics.
     """
     try:
-        perf = simulate_send_campaign(db, campaign_id)
+        perf = send_approved_campaign(db, campaign_id)
         return APIResponse(
             success=True,
-            message=f"Campaign sent to {perf.emails_sent} recipients. "
-                    f"Simulated open rate: {perf.open_rate:.1%}, click rate: {perf.click_rate:.1%}",
+            message=f"Campaign sent to {perf.emails_sent} recipients via CampaignX API. "
+                    f"Open rate: {perf.open_rate:.1%}, click rate: {perf.click_rate:.1%}",
             data={
                 "emails_sent": perf.emails_sent,
+                "emails_opened": perf.emails_opened,
+                "emails_clicked": perf.emails_clicked,
                 "open_rate": perf.open_rate,
                 "click_rate": perf.click_rate,
-                "sentiment_score": perf.sentiment_score,
             }
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"Send campaign failed: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.get("/campaign/{campaign_id}/analytics", response_model=CampaignAnalytics, tags=["Campaign"])
@@ -130,6 +135,27 @@ def get_analytics_endpoint(campaign_id: int, db: Session = Depends(get_db)):
         return get_campaign_analytics(db, campaign_id)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
+
+
+@router.post("/campaign/{campaign_id}/optimize", response_model=OptimizationResult, tags=["Campaign"])
+def optimize_campaign_endpoint(
+    campaign_id: int,
+    payload: OptimizationRequest,
+    db: Session = Depends(get_db),
+):
+    """
+    Autonomous Optimization Loop.
+    Reads performance from a sent campaign, generates an improved variant,
+    auto-approves it, and sends it via CampaignX API.
+    Returns the OptimizationResult for human visibility.
+    """
+    try:
+        return run_optimization_loop(db, campaign_id, payload.approved_by, payload.send_time)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"Optimization loop failed: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 # ─── User Endpoints ────────────────────────────────────────────────────────────
@@ -152,14 +178,14 @@ def create_user(payload: UserCreate, db: Session = Depends(get_db)):
 
 # ─── Admin / Utility Endpoints ────────────────────────────────────────────────
 
-@router.post("/admin/seed-users", response_model=APIResponse, tags=["Admin"])
-def seed_users_endpoint(db: Session = Depends(get_db)):
-    """Seed demo users for testing. Safe to call multiple times (idempotent)."""
-    count = seed_demo_users(db)
-    return APIResponse(success=True, message=f"{count} demo users available in the system.", data={"count": count})
+@router.post("/admin/refresh-cohort", response_model=APIResponse, tags=["Admin"])
+def refresh_cohort_endpoint(db: Session = Depends(get_db)):
+    """Force-refresh the customer cohort from the CampaignX API (use at start of Test phase)."""
+    count = refresh_cohort()
+    return APIResponse(success=True, message=f"Cohort refreshed: {count} customers loaded.", data={"count": count})
 
 
 @router.get("/health", tags=["Health"])
 def health_check():
     """Health check endpoint."""
-    return {"status": "healthy", "service": "BFSI Multi-Agent Email Marketing System"}
+    return {"status": "healthy", "service": "MailPilot"}

@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { createCampaign, seedUsers } from '../api/client'
+import { createCampaign } from '../api/client'
 
 const EXAMPLES = [
   'Promote a new home loan product targeting salaried professionals in Maharashtra with competitive interest rates.',
@@ -15,11 +15,9 @@ const S = {
   backBtn: { background: 'none', border: 'none', padding: 0, color: '#6b7280', fontSize: 13, cursor: 'pointer' },
   title: { fontSize: 22, fontWeight: 700, color: '#111827', margin: '0 0 6px' },
   subtitle: { fontSize: 14, color: '#6b7280', margin: '0 0 28px' },
-  seedBox: { background: '#fffbeb', border: '1px solid #fcd34d', borderRadius: 8, padding: '14px 16px', marginBottom: 24, display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16 },
-  seedText: { fontSize: 13, color: '#92400e', fontWeight: 600, marginBottom: 2 },
-  seedSub: { fontSize: 12, color: '#b45309' },
-  seedMsg: { fontSize: 12, color: '#166534', marginTop: 4 },
-  seedBtn: { background: '#f59e0b', color: '#fff', border: 'none', borderRadius: 6, padding: '7px 14px', fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', flexShrink: 0 },
+  cohortBox: { background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 8, padding: '14px 16px', marginBottom: 24 },
+  cohortText: { fontSize: 13, color: '#166534', fontWeight: 600, marginBottom: 2 },
+  cohortSub: { fontSize: 12, color: '#15803d' },
   card: { background: '#fff', border: '1px solid #e5e7eb', borderRadius: 8, padding: 24 },
   label: { display: 'block', fontSize: 14, fontWeight: 600, color: '#374151', marginBottom: 8 },
   textarea: { width: '100%', border: '1px solid #d1d5db', borderRadius: 6, padding: '10px 12px', fontSize: 14, color: '#111827', resize: 'vertical', outline: 'none', boxSizing: 'border-box', lineHeight: 1.6 },
@@ -39,9 +37,7 @@ const S = {
 export default function CreateCampaign() {
   const [objective, setObjective] = useState('')
   const [loading, setLoading] = useState(false)
-  const [seedLoading, setSeedLoading] = useState(false)
   const [error, setError] = useState(null)
-  const [seedMsg, setSeedMsg] = useState(null)
   const navigate = useNavigate()
 
   const handleSubmit = async (e) => {
@@ -56,19 +52,6 @@ export default function CreateCampaign() {
       setError(err.response?.data?.detail || err.message || 'Something went wrong.')
     } finally {
       setLoading(false)
-    }
-  }
-
-  const handleSeed = async () => {
-    setSeedLoading(true)
-    setSeedMsg(null)
-    try {
-      const res = await seedUsers()
-      setSeedMsg(res.data.message)
-    } catch (err) {
-      setSeedMsg('Error: ' + (err.response?.data?.detail || err.message))
-    } finally {
-      setSeedLoading(false)
     }
   }
 
@@ -87,16 +70,10 @@ export default function CreateCampaign() {
         Describe your objective in plain English. The AI agents will plan, write, and validate the campaign automatically.
       </p>
 
-      {/* Seed users notice */}
-      <div style={S.seedBox}>
-        <div>
-          <p style={S.seedText}>First time? Seed demo users</p>
-          <p style={S.seedSub}>Loads 30 sample Indian BFSI users for segmentation.</p>
-          {seedMsg && <p style={S.seedMsg}>{seedMsg}</p>}
-        </div>
-        <button style={S.seedBtn} onClick={handleSeed} disabled={seedLoading}>
-          {seedLoading ? 'Seeding...' : 'Seed Users'}
-        </button>
+      {/* Cohort info */}
+      <div style={S.cohortBox}>
+        <p style={S.cohortText}>5,000-customer cohort loaded live from CampaignX API</p>
+        <p style={S.cohortSub}>Segmentation agent will select the best-fit recipients from the real cohort at send time.</p>
       </div>
 
       {/* Form */}

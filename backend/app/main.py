@@ -32,7 +32,7 @@ app = FastAPI(
     title=settings.APP_NAME,
     version=settings.APP_VERSION,
     description=(
-        "A production-ready multi-agent AI system for BFSI email marketing campaigns. "
+        "MailPilot — a production-ready multi-agent AI system for BFSI email marketing campaigns. "
         "Uses Groq LLaMA3-70B for strategy, content generation, segmentation, and compliance."
     ),
     lifespan=lifespan,

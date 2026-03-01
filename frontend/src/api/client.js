@@ -5,7 +5,7 @@ const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1'
 const api = axios.create({
   baseURL: BASE_URL,
   headers: { 'Content-Type': 'application/json' },
-  timeout: 120000, // 2 min — LLM calls can be slow
+  timeout: 180000, // 3 min — LLM + API calls can be slow
 })
 
 // Campaign endpoints
@@ -30,9 +30,12 @@ export const sendCampaign = (id) =>
 export const getCampaignAnalytics = (id) =>
   api.get(`/campaign/${id}/analytics`)
 
+export const optimizeCampaign = (id, data) =>
+  api.post(`/campaign/${id}/optimize`, data)
+
 // Admin
-export const seedUsers = () =>
-  api.post('/admin/seed-users')
+export const refreshCohort = () =>
+  api.post('/admin/refresh-cohort')
 
 export const listUsers = () =>
   api.get('/users')

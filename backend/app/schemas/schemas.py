@@ -46,7 +46,7 @@ class EmailContentOutput(BaseModel):
 class SegmentationOutput(BaseModel):
     filters_applied: str
     selected_user_count: int
-    selected_user_ids: List[int]
+    selected_user_ids: List[str]
     reasoning: str
 
 
@@ -73,6 +73,8 @@ class CampaignRead(BaseModel):
     approved_by: Optional[str] = None
     approval_timestamp: Optional[datetime] = None
     rejection_reason: Optional[str] = None
+    send_time: Optional[str] = None
+    campaignx_campaign_id: Optional[str] = None
     created_at: Optional[datetime] = None
 
     class Config:
@@ -83,6 +85,7 @@ class CampaignApprove(BaseModel):
     approved_by: str = Field(..., description="Name or ID of the approver")
     action: str = Field(..., description="approve or reject")
     rejection_reason: Optional[str] = None
+    send_time: Optional[str] = None  # 'DD:MM:YY HH:MM:SS' IST — set on approval
 
 
 class CampaignEdit(BaseModel):
@@ -134,3 +137,23 @@ class APIResponse(BaseModel):
     success: bool
     message: str
     data: Optional[Any] = None
+
+
+# ─── Optimization Loop ─────────────────────────────────────────────────────────
+
+class OptimizationRequest(BaseModel):
+    approved_by: str = Field(..., description="Approver name for the optimized variant")
+    send_time: Optional[str] = None  # if None, agent auto-schedules
+
+
+class OptimizationResult(BaseModel):
+    original_campaign_id: int
+    new_campaign_id: int
+    strategy: StrategyOutput
+    email_content: EmailContentOutput
+    segmentation: SegmentationOutput
+    compliance: ComplianceOutput
+    compliance_retries: int
+    summary_explanation: str
+    optimization_reasoning: str
+    status: str

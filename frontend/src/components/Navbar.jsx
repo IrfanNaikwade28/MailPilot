@@ -12,9 +12,9 @@ export default function Navbar() {
           style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 10, padding: 0 }}
         >
           <div style={{ width: 32, height: 32, background: '#1d4ed8', borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <span style={{ color: '#fff', fontWeight: 700, fontSize: 14 }}>B</span>
+            <span style={{ color: '#fff', fontWeight: 700, fontSize: 14 }}>M</span>
           </div>
-          <span style={{ fontWeight: 700, fontSize: 15, color: '#111827' }}>BFSI CampaignAI</span>
+          <span style={{ fontWeight: 700, fontSize: 15, color: '#111827' }}>MailPilot</span>
         </button>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>

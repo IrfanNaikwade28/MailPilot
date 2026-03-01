@@ -5,7 +5,7 @@ from functools import lru_cache
 
 class Settings(BaseSettings):
     # App
-    APP_NAME: str = "BFSI Multi-Agent Email Marketing System"
+    APP_NAME: str = "MailPilot"
     APP_VERSION: str = "1.0.0"
     DEBUG: bool = False
 
@@ -19,6 +19,10 @@ class Settings(BaseSettings):
     # Campaign
     OPEN_RATE_THRESHOLD: float = 0.25
     MAX_COMPLIANCE_RETRIES: int = 3
+
+    # CampaignX InXiteOut API
+    CAMPAIGNX_API_KEY: str = ""
+    CAMPAIGNX_API_BASE: str = "https://campaignx.inxiteout.ai"
 
     # CORS
     ALLOWED_ORIGINS: list = ["http://localhost:5173", "http://localhost:3000"]

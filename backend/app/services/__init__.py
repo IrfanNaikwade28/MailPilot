@@ -6,8 +6,10 @@ from app.services.campaign_service import (
     approve_campaign,
     edit_campaign_email,
     get_campaign_analytics,
+    send_approved_campaign,
+    run_optimization_loop,
+    refresh_cohort,
 )
-from app.services.email_service import simulate_send_campaign, seed_demo_users
 
 __all__ = [
     "create_campaign",
@@ -17,6 +19,7 @@ __all__ = [
     "approve_campaign",
     "edit_campaign_email",
     "get_campaign_analytics",
-    "simulate_send_campaign",
-    "seed_demo_users",
+    "send_approved_campaign",
+    "run_optimization_loop",
+    "refresh_cohort",
 ]

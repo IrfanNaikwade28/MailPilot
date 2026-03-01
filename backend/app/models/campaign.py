@@ -16,6 +16,8 @@ class Campaign(Base):
     approved_by = Column(String(100), nullable=True)
     approval_timestamp = Column(DateTime(timezone=True), nullable=True)
     rejection_reason = Column(Text, nullable=True)
+    send_time = Column(String(30), nullable=True)           # scheduled send time (IST) 'DD:MM:YY HH:MM:SS'
+    campaignx_campaign_id = Column(String(100), nullable=True)  # UUID from InXiteOut send_campaign API
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
