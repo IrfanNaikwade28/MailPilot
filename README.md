@@ -3,11 +3,38 @@
 **FrostHack / XPECTO 2026 @ IIT Mandi — CampaignX Hackathon by InXiteOut**
 Team: **CodeAkatsuki**
 
-MailPilot is a production-ready multi-agent AI web application for planning, generating, and autonomously optimising BFSI (Banking, Financial Services & Insurance) email marketing campaigns across India. It integrates directly with the **InXiteOut CampaignX live API** — real 5000-customer cohort, real sends, real open/click metrics.
+MailPilot is a production-ready multi-agent AI web application for planning, generating, and autonomously optimising BFSI (Banking, Financial Services & Insurance) email marketing campaigns. It integrates directly with the **InXiteOut CampaignX live API** — real 1,000-customer cohort, real sends, real open/click metrics.
 
 ---
 
-## Live Test Results
+## Final Round Results — 14 March 2026 Submission
+
+| Metric | Value |
+|--------|-------|
+| **Total Customers (Cohort)** | 1,000 |
+| **Campaigns Sent** | 8 (4 original + 4 optimization variants) |
+| **Email Opens (EO=Y)** | **672** |
+| **Email Clicks (EC=Y)** | **317** |
+| **Hackathon Score (EO+EC)** | **989** |
+| **Coverage** | **1,000 / 1,000 (100%)** |
+| **LLM** | LLaMA 3.3 70B via Groq |
+
+### Campaign Breakdown
+
+| Campaign | Segment | Sent | Opens | Clicks | EO+EC |
+|----------|---------|------|-------|--------|-------|
+| #4 | IT/Engineer/Data/BA/Accountant | 204 | 59 | 28 | 87 |
+| #5 | Doctor/Pharmacist/Nurse/Advocate | 177 | 82 | 40 | 122 |
+| #6 | Teacher/GovtEmp/Ops/HR/Consultant | 191 | 84 | 37 | 121 |
+| #7 | All remaining customers | 428 | 222 | 106 | 328 |
+| #8 | Optimization: C4 non-openers | 145 | 56 | 25 | 81 |
+| #9 | Optimization: C5 non-openers | 95 | 44 | 25 | 69 |
+| #10 | Optimization: C6 non-openers | 107 | 43 | 21 | 64 |
+| #11 | Optimization: C7 non-openers | 206 | 82 | 35 | 117 |
+
+---
+
+## Live Test Results (Earlier Rounds)
 
 | Campaign | Objective | Recipients | Open Rate | Click Rate |
 |----------|-----------|------------|-----------|------------|
@@ -17,7 +44,6 @@ MailPilot is a production-ready multi-agent AI web application for planning, gen
 | #9 | Business loan — entrepreneurs | 492 | 18.9% | 8.7% |
 | #10 | High-yield FD — broad salaried | 867 | 16.4% | 8.0% |
 
-**Total emails sent: 2,849 across 5 live campaigns**
 All metrics sourced directly from InXiteOut `GET /api/v1/get_report`.
 
 ---
@@ -27,34 +53,34 @@ All metrics sourced directly from InXiteOut `GET /api/v1/get_report`.
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │                   Frontend (React + Vite)                    │
-│  Dashboard → Create → Campaign Preview → Email Preview →    │
-│            Approval Dashboard → Analytics                    │
+│  Dashboard → Coverage → Create → Campaign Preview →          │
+│            Approval Dashboard → Analytics                     │
 └──────────────────────┬──────────────────────────────────────┘
-                       │ HTTP / REST (Axios, 3 min timeout)
-                       ▼
+                      │ HTTP / REST (Axios, 3 min timeout)
+                      ▼
 ┌─────────────────────────────────────────────────────────────┐
 │                  Backend (FastAPI + Python)                   │
 │  /campaign/create   /campaign/:id/approve                    │
-│  /campaign/:id/send /campaign/:id/analytics                  │
-│  /campaign/:id/optimize  /admin/refresh-cohort               │
+│  /campaign/:id/send /campaign/:id/analytics                 │
+│  /campaign/:id/optimize  /coverage /coverage/uncovered-ids  │
 └──────────┬──────────────────────────┬────────────────────────┘
            │                          │
            ▼                          ▼
 ┌────────────────────┐    ┌─────────────────────────────────┐
 │   Orchestrator     │    │  InXiteOut CampaignX API (LIVE) │
 │                    │    │  GET  /api/v1/get_customer_cohort│
-│  Strategy Agent    │    │  POST /api/v1/send_campaign      │
-│       ↓            │    │  GET  /api/v1/get_report         │
-│  Content Agent     │◄───┤  (5000 real customers, IST time) │
+│  Strategy Agent    │    │  POST /api/v1/send_campaign     │
+│       ↓            │    │  GET  /api/v1/get_report        │
+│  Content Agent     │◄───┤  (1000 real customers, IST)    │
 │       ↓            │    └─────────────────────────────────┘
 │  Compliance Agent  │    ┌─────────────────────────────────┐
-│  (retry loop ≤3)   │    │  Groq API (LLM Brain)           │
+│  (retry loop ≤3)  │    │  Groq API (LLM Brain)           │
 │       ↓            │◄───┤  llama-3.3-70b-versatile        │
 │  Segmentation Agent│    │  All agent reasoning + tool     │
 │       ↓            │    │  selection (dynamic discovery)  │
 │  Human Approval    │    └─────────────────────────────────┘
 │       ↓            │    ┌─────────────────────────────────┐
-│  Send + Report     │    │  SQLite DB (email_marketing.db) │
+│  Send + Report     │    │  SQLite DB (email_marketing.db)│
 └────────────────────┘    │  Campaign / Performance tables  │
                           └─────────────────────────────────┘
 ```
@@ -79,9 +105,9 @@ All metrics sourced directly from InXiteOut `GET /api/v1/get_report`.
 - **Role:** Reviews email against RBI/SEBI/IRDAI guidelines — detects misleading claims, missing disclaimers, informal tone; feeds revision notes back to Content Agent (up to 3 retries)
 
 ### Agent 4 — Segmentation Agent
-- **Input:** Target persona + real 5000-customer cohort
+- **Input:** Target persona + real 1,000-customer cohort
 - **Output:** `{ filters_applied, selected_user_count, selected_user_ids, reasoning }`
-- **Role:** LLM extracts filter criteria from persona (occupation keywords, cities, income range, credit score, app/social engagement signals); deterministic Python filter applied to cohort — 25 exact occupation values, 20 exact city spellings, city alias map (Bangalore→Bengaluru)
+- **Role:** LLM extracts filter criteria from persona (occupation keywords, cities, income range, credit score, app/social engagement signals); deterministic Python filter applied to cohort — 25 exact occupation values, city alias map (Bangalore→Bengaluru)
 
 ### Agent 5 — Orchestrator
 - **Role:** Coordinates all agents; builds summary explanation; runs autonomous optimization loop
@@ -95,7 +121,7 @@ The InXiteOut API client (`utils/inxiteout_api.py`) implements **LLM-based dynam
 1. Fetches live OpenAPI spec from `https://campaignx.inxiteout.ai/openapi.json`
 2. LLM selects the correct tool (returns only `tool_name / method / path` — 3 fields)
 3. **Actual payload is injected by the caller** — LLM never touches email bodies or ID lists
-4. This prevents truncation of 500+ customer ID lists and long email bodies
+4. This prevents truncation of customer ID lists and long email bodies
 
 ---
 
@@ -108,6 +134,7 @@ The InXiteOut API client (`utils/inxiteout_api.py`) implements **LLM-based dynam
 5. Send dispatched to InXiteOut CampaignX API
 6. Real open/click metrics fetched from `get_report` API and stored
 7. Analytics page shows learning insights + optimization trigger
+8. Coverage page tracks full cohort coverage (1000/1000 required for final scoring)
 
 ---
 
@@ -116,10 +143,11 @@ The InXiteOut API client (`utils/inxiteout_api.py`) implements **LLM-based dynam
 `POST /campaign/:id/optimize` triggers:
 
 1. Reads real performance from the sent campaign
-2. Builds enriched objective with performance context (open rate, click rate, tone, persona, subject)
-3. Directs agents to improve: subject line, tone, or target a higher-engagement micro-segment
+2. Identifies **non-openers (EO=N)** and **non-clickers (EO=Y, EC=N)** from the report
+3. Targets the larger sub-group with a completely rewritten email (different subject line, body tweaks)
 4. Runs full pipeline → new campaign auto-approved → sent via CampaignX API
 5. Returns `OptimizationResult` for human visibility
+6. **Key:** Never re-sends to already-engaged customers — maximizes new EO/EC events
 
 ---
 
@@ -129,12 +157,12 @@ The InXiteOut API client (`utils/inxiteout_api.py`) implements **LLM-based dynam
 MultiAgent Email Marketing System/
 ├── backend/
 │   ├── .env                        # GROQ_API_KEY, CAMPAIGNX_API_KEY, APP_NAME="MailPilot"
-│   ├── email_marketing.db          # SQLite — Campaign, CampaignPerformance tables
+│   ├── email_marketing.db          # SQLite — Campaign, CampaignPerformance, CampaignCoverage tables
 │   └── app/
 │       ├── main.py                 # FastAPI app, CORS, lifespan
 │       ├── config.py               # Pydantic Settings (env-based)
 │       ├── database.py             # SQLAlchemy engine + session
-│       ├── models/campaign.py      # Campaign, CampaignPerformance ORM models
+│       ├── models/campaign.py      # Campaign, CampaignPerformance, CampaignCoverage ORM models
 │       ├── schemas/schemas.py      # All Pydantic v2 schemas
 │       ├── agents/
 │       │   ├── strategy_agent.py   # Agent 1: campaign strategy
@@ -143,8 +171,9 @@ MultiAgent Email Marketing System/
 │       │   ├── segmentation_agent.py # Agent 4: real cohort filtering
 │       │   └── orchestrator.py     # Agent 5: coordination + optimization
 │       ├── services/
-│       │   └── campaign_service.py # DB ops, send, metrics, optimization loop
-│       ├── api/routes.py           # All 10 REST endpoints
+│       │   ├── campaign_service.py # DB ops, send, metrics, optimization loop
+│       │   └── cohort_service.py   # Live cohort management from CampaignX API
+│       ├── api/routes.py           # All REST endpoints
 │       └── utils/
 │           ├── groq_client.py      # Groq LLM client
 │           └── inxiteout_api.py    # Dynamic tool discovery client
@@ -153,11 +182,12 @@ MultiAgent Email Marketing System/
     └── src/
         ├── api/client.js           # Axios client (3 min timeout)
         ├── components/
-        │   ├── Navbar.jsx          # MailPilot branding
+        │   ├── Navbar.jsx         # MailPilot branding + live EO+EC score badge
         │   └── StatusBadge.jsx
         └── pages/
-            ├── Dashboard.jsx
-            ├── CreateCampaign.jsx  # Real cohort info banner
+            ├── Dashboard.jsx       # Campaign list with EO+EC stats
+            ├── Coverage.jsx        # Cohort coverage tracking (1000/1000)
+            ├── CreateCampaign.jsx # Real cohort info banner
             ├── CampaignPreview.jsx
             ├── EmailPreview.jsx
             ├── ApprovalDashboard.jsx # IST send time picker
@@ -209,13 +239,16 @@ npm run dev
 |--------|----------|-------------|
 | `POST` | `/api/v1/campaign/create` | Create campaign + run full agent pipeline |
 | `GET`  | `/api/v1/campaign/list` | List all campaigns (newest first) |
+| `GET`  | `/api/v1/campaign/list-with-stats` | List campaigns with performance data |
 | `GET`  | `/api/v1/campaign/{id}` | Get campaign by ID |
 | `PATCH`| `/api/v1/campaign/{id}/edit` | Edit email fields (human review) |
 | `POST` | `/api/v1/campaign/{id}/approve` | Approve or reject campaign (with send_time) |
 | `POST` | `/api/v1/campaign/{id}/send` | Send via InXiteOut CampaignX API |
 | `GET`  | `/api/v1/campaign/{id}/analytics` | Analytics + learning insights |
 | `POST` | `/api/v1/campaign/{id}/optimize` | Autonomous optimization loop |
-| `POST` | `/api/v1/admin/refresh-cohort` | Force-refresh 5000-customer cohort |
+| `POST` | `/api/v1/admin/refresh-cohort` | Force-refresh 1,000-customer cohort |
+| `GET`  | `/api/v1/coverage` | Get cohort coverage stats |
+| `GET`  | `/api/v1/coverage/uncovered-ids` | Get list of uncovered customer IDs |
 | `GET`  | `/api/v1/health` | Health check |
 
 ---
@@ -242,8 +275,21 @@ npm run dev
 
 - **LLM selection-only tool discovery** — LLM chooses the API tool (3-field JSON) but never constructs the payload, preventing truncation of large bodies and ID lists.
 - **Deterministic segmentation** — LLM extracts filter criteria; Python applies them. Reproducible, auditable, no hallucinated customer IDs.
+- **Coverage-first segmentation** — When uncovered customers < 100%, automatically strips secondary filters to guarantee full cohort coverage.
 - **Compliance retry loop** — Content Agent regenerates email up to 3 times with precise revision notes from Compliance Agent.
 - **City alias map** — `Bangalore → Bengaluru`, `Bombay → Mumbai` etc. ensures LLM-generated city names match exact cohort spellings.
 - **Engagement signal filters** — Segmentation Agent can filter on `App_Installed` and `Social_Media_Active` to target digitally-active customers.
+- **Non-opener targeting in optimization** — Optimization loop specifically targets only EO=N customers to maximize new opens/clicks.
 - **SQLite for portability** — no PostgreSQL install required; schema auto-created on first run.
 - **No `--reload`** — cohort is cached in memory; reload would clear cache and waste API rate limit calls.
+- **xDeposit CTA** — All campaigns use `https://superbfsi.com/xdeposit/explore/` as the CTA URL (per §6.4 rules).
+
+---
+
+## Scoring Rule (Final Round)
+
+- **Evaluation window:** 9 March 11:59 PM → 14 March 11:59 PM IST
+- **Cohort:** 1,000 customers (CUST0001–CUST1000)
+- **Scoring:** Raw count of **EO=Y + EC=Y** (not percentages/rates)
+- **Coverage requirement:** Every customer must be targeted at least once in the most recent campaigns
+- **MailPilot achieved:** 100% coverage (1,000/1,000) with **989 total EO+EC**
