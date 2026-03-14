@@ -22,6 +22,7 @@ export default function Navbar() {
           <NavLink label="Campaigns" path="/" current={location.pathname === '/'} onClick={() => navigate('/')} />
           <NavLink label="Coverage" path="/coverage" current={location.pathname === '/coverage'} onClick={() => navigate('/coverage')} />
           <NavLink label="New Campaign" path="/create" current={location.pathname === '/create'} onClick={() => navigate('/create')} />
+          <NavLink label="Settings" path="/settings" current={location.pathname === '/settings'} onClick={() => navigate('/settings')} />
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>

@@ -7,6 +7,7 @@ import EmailPreview from './pages/EmailPreview'
 import ApprovalDashboard from './pages/ApprovalDashboard'
 import Analytics from './pages/Analytics'
 import Coverage from './pages/Coverage'
+import Settings from './pages/Settings'
 
 export default function App() {
   return (
@@ -22,6 +23,7 @@ export default function App() {
             <Route path="/campaign/:id/approve" element={<ApprovalDashboard />} />
             <Route path="/campaign/:id/analytics" element={<Analytics />} />
             <Route path="/coverage" element={<Coverage />} />
+            <Route path="/settings" element={<Settings />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </main>

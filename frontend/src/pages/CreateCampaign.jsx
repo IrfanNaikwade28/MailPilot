@@ -1,6 +1,6 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { createCampaign } from '../api/client'
+import { createCampaign, getSettings, getDatasetPreview } from '../api/client'
 
 const EXAMPLES = [
   'Promote SuperbFSI xDeposit to IT professionals and engineers who want high-yield fixed deposits with flexible tenures.',
@@ -18,6 +18,12 @@ const S = {
   cohortBox: { background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 8, padding: '14px 16px', marginBottom: 24 },
   cohortText: { fontSize: 13, color: '#166534', fontWeight: 600, marginBottom: 2 },
   cohortSub: { fontSize: 12, color: '#15803d' },
+  csvBox: { background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 8, padding: '14px 16px', marginBottom: 24 },
+  csvText: { fontSize: 13, color: '#1e40af', fontWeight: 600, marginBottom: 2 },
+  csvSub: { fontSize: 12, color: '#1d4ed8' },
+  csvWarnBox: { background: '#fffbeb', border: '1px solid #fcd34d', borderRadius: 8, padding: '12px 16px', marginBottom: 16 },
+  csvWarnText: { fontSize: 12, color: '#92400e' },
+  csvLink: { color: '#1d4ed8', cursor: 'pointer', textDecoration: 'underline', background: 'none', border: 'none', padding: 0, fontSize: 12 },
   card: { background: '#fff', border: '1px solid #e5e7eb', borderRadius: 8, padding: 24 },
   label: { display: 'block', fontSize: 14, fontWeight: 600, color: '#374151', marginBottom: 8 },
   textarea: { width: '100%', border: '1px solid #d1d5db', borderRadius: 6, padding: '10px 12px', fontSize: 14, color: '#111827', resize: 'vertical', outline: 'none', boxSizing: 'border-box', lineHeight: 1.6 },
@@ -38,7 +44,23 @@ export default function CreateCampaign() {
   const [objective, setObjective] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
+  const [dataSource, setDataSource] = useState('api')
+  const [csvInfo, setCsvInfo] = useState(null) // { row_count, columns }
   const navigate = useNavigate()
+
+  useEffect(() => {
+    getSettings()
+      .then(r => {
+        const s = r.data
+        setDataSource(s.data_source || 'api')
+        if (s.data_source === 'csv' && s.csv_uploaded) {
+          getDatasetPreview()
+            .then(p => setCsvInfo({ row_count: p.data.row_count, columns: p.data.columns }))
+            .catch(() => {})
+        }
+      })
+      .catch(() => {})
+  }, [])
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -70,11 +92,34 @@ export default function CreateCampaign() {
         Describe your xDeposit campaign objective in plain English. The AI agents will plan, write, and validate the campaign automatically.
       </p>
 
-      {/* Cohort info */}
-      <div style={S.cohortBox}>
-        <p style={S.cohortText}>1,000-customer cohort loaded live from CampaignX API</p>
-        <p style={S.cohortSub}>Segmentation agent will select the best-fit recipients from the real cohort at send time.</p>
-      </div>
+      {/* Data source info */}
+      {dataSource === 'csv' ? (
+        <>
+          <div style={S.csvBox}>
+            <p style={S.csvText}>
+              CSV Dataset active
+              {csvInfo ? ` — ${csvInfo.row_count.toLocaleString()} rows` : ''}
+            </p>
+            <p style={S.csvSub}>
+              {csvInfo
+                ? `Columns: ${csvInfo.columns.slice(0, 6).join(', ')}${csvInfo.columns.length > 6 ? ', ...' : ''}`
+                : 'No file uploaded yet — go to Settings to upload a CSV.'}
+            </p>
+          </div>
+          <div style={S.csvWarnBox}>
+            <p style={S.csvWarnText}>
+              Customer IDs in your CSV must match the CampaignX cohort for sends and analytics to work.
+              To switch back to the live cohort, go to{' '}
+              <button style={S.csvLink} onClick={() => navigate('/settings')}>Settings</button>.
+            </p>
+          </div>
+        </>
+      ) : (
+        <div style={S.cohortBox}>
+          <p style={S.cohortText}>1,000-customer cohort loaded live from CampaignX API</p>
+          <p style={S.cohortSub}>Segmentation agent will select the best-fit recipients from the real cohort at send time.</p>
+        </div>
+      )}
 
       {/* Form */}
       <form onSubmit={handleSubmit} style={S.card}>

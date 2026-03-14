@@ -2,8 +2,10 @@
 API Routes — all endpoints for MailPilot.
 """
 import logging
-from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
+from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, UploadFile, File
 from sqlalchemy.orm import Session
+from typing import Optional
+from pydantic import BaseModel
 
 from app.database import get_db
 from app.schemas import (
@@ -18,7 +20,19 @@ from app.services import (
     get_coverage_stats, get_uncovered_customer_ids,
 )
 from app.services.campaign_service import debug_segment_size, list_campaigns_with_stats
+from app.services.customer_data_service import (
+    get_data_source_settings,
+    save_data_source_settings,
+    upload_csv,
+    get_csv_preview,
+)
 from app.models.user import User
+
+
+class SettingsSaveRequest(BaseModel):
+    data_source: str
+    api_key: Optional[str] = None
+    base_url: Optional[str] = None
 
 logger = logging.getLogger(__name__)
 
@@ -238,4 +252,62 @@ def debug_segment_size_endpoint(db: Session = Depends(get_db)):
         return debug_segment_size(db)
     except Exception as e:
         logger.error(f"debug_segment_size failed: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ─── Settings Endpoints ───────────────────────────────────────────────────────
+
+@router.get("/settings", tags=["Settings"])
+def get_settings_endpoint():
+    """Get current data source settings (data_source, api_key, base_url, csv_uploaded)."""
+    return get_data_source_settings()
+
+
+@router.post("/settings", tags=["Settings"])
+def save_settings_endpoint(payload: SettingsSaveRequest):
+    """
+    Save data source selection.
+    data_source must be 'api' or 'csv'.
+    Optionally update api_key and base_url when using CampaignX API mode.
+    """
+    try:
+        return save_data_source_settings(
+            data_source=payload.data_source,
+            api_key=payload.api_key,
+            base_url=payload.base_url,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/settings/upload-csv", tags=["Settings"])
+async def upload_csv_endpoint(file: UploadFile = File(...)):
+    """
+    Upload a CSV file as the customer dataset.
+    The file is stored at backend/data/uploaded_dataset.csv.
+    Returns a preview: { row_count, columns, first_10_rows }.
+    """
+    if not file.filename or not file.filename.lower().endswith(".csv"):
+        raise HTTPException(status_code=400, detail="Only CSV files are accepted.")
+    try:
+        contents = await file.read()
+        preview = upload_csv(contents, file.filename or "dataset.csv")
+        return {"success": True, "filename": file.filename, **preview}
+    except Exception as e:
+        logger.error(f"CSV upload failed: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/settings/dataset-preview", tags=["Settings"])
+def dataset_preview_endpoint():
+    """
+    Return a preview of the currently uploaded CSV dataset.
+    Returns: { row_count, columns, first_10_rows }
+    """
+    try:
+        return get_csv_preview()
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        logger.error(f"Dataset preview failed: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))

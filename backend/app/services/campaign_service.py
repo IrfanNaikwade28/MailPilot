@@ -47,8 +47,13 @@ def refresh_cohort() -> int:
 
 
 def _get_agent_users() -> List[Dict[str, Any]]:
-    """Return cohort as agent-ready user dicts (cached)."""
-    return cohort_to_agent_users()
+    """
+    Return customers as agent-ready user dicts.
+    Delegates to customer_data_service which picks the active data source
+    (CampaignX API or uploaded CSV) based on settings.json.
+    """
+    from app.services.customer_data_service import get_customers
+    return get_customers()
 
 
 # ── Coverage functions ─────────────────────────────────────────────────────────

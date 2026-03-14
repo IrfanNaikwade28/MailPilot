@@ -50,4 +50,22 @@ export const getCoverageStats = () =>
 export const getUncoveredIds = () =>
   api.get('/coverage/uncovered-ids')
 
+// Settings
+export const getSettings = () =>
+  api.get('/settings')
+
+export const saveSettings = (data) =>
+  api.post('/settings', data)
+
+export const uploadCsv = (file) => {
+  const formData = new FormData()
+  formData.append('file', file)
+  return api.post('/settings/upload-csv', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  })
+}
+
+export const getDatasetPreview = () =>
+  api.get('/settings/dataset-preview')
+
 export default api
