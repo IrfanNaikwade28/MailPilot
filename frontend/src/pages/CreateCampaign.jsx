@@ -3,10 +3,10 @@ import { useNavigate } from 'react-router-dom'
 import { createCampaign } from '../api/client'
 
 const EXAMPLES = [
-  'Promote a new home loan product targeting salaried professionals in Maharashtra with competitive interest rates.',
-  'Launch a term insurance awareness campaign for working professionals aged 25–40 across metro cities in India.',
-  'Drive credit card applications among high-income IT professionals in Bangalore and Hyderabad.',
-  'Promote mutual fund SIP plans targeting first-time investors with monthly income above ₹50,000.',
+  'Promote SuperbFSI xDeposit to IT professionals and engineers who want high-yield fixed deposits with flexible tenures.',
+  'Drive xDeposit sign-ups among doctors, pharmacists, and healthcare professionals looking to grow their savings safely.',
+  'Encourage government employees and teachers to open an xDeposit account and earn competitive interest rates.',
+  'Target business owners and entrepreneurs with the SuperbFSI xDeposit offer — secure, high-interest savings with instant liquidity.',
 ]
 
 const S = {
@@ -67,12 +67,12 @@ export default function CreateCampaign() {
 
       <h1 style={S.title}>New Campaign</h1>
       <p style={S.subtitle}>
-        Describe your objective in plain English. The AI agents will plan, write, and validate the campaign automatically.
+        Describe your xDeposit campaign objective in plain English. The AI agents will plan, write, and validate the campaign automatically.
       </p>
 
       {/* Cohort info */}
       <div style={S.cohortBox}>
-        <p style={S.cohortText}>5,000-customer cohort loaded live from CampaignX API</p>
+        <p style={S.cohortText}>1,000-customer cohort loaded live from CampaignX API</p>
         <p style={S.cohortSub}>Segmentation agent will select the best-fit recipients from the real cohort at send time.</p>
       </div>
 
@@ -85,7 +85,7 @@ export default function CreateCampaign() {
           value={objective}
           onChange={(e) => setObjective(e.target.value)}
           rows={5}
-          placeholder="e.g. Promote a new home loan product targeting salaried professionals in Maharashtra..."
+          placeholder="e.g. Promote SuperbFSI xDeposit to IT professionals looking for high-yield fixed deposits..."
           style={S.textarea}
         />
         <p style={S.charCount}>{objective.length} characters — minimum 10</p>

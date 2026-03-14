@@ -15,6 +15,9 @@ export const createCampaign = (objective) =>
 export const listCampaigns = () =>
   api.get('/campaign/list')
 
+export const listCampaignsWithStats = () =>
+  api.get('/campaign/list-with-stats')
+
 export const getCampaign = (id) =>
   api.get(`/campaign/${id}`)
 
@@ -39,5 +42,12 @@ export const refreshCohort = () =>
 
 export const listUsers = () =>
   api.get('/users')
+
+// Coverage
+export const getCoverageStats = () =>
+  api.get('/coverage')
+
+export const getUncoveredIds = () =>
+  api.get('/coverage/uncovered-ids')
 
 export default api

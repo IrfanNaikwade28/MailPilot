@@ -5,6 +5,7 @@ from app.schemas.schemas import (
     CampaignPerformanceRead, CampaignAnalytics,
     OrchestratorResult, APIResponse,
     OptimizationRequest, OptimizationResult,
+    CoverageStats, CampaignCoverageRead,
 )
 
 __all__ = [
@@ -14,4 +15,5 @@ __all__ = [
     "CampaignPerformanceRead", "CampaignAnalytics",
     "OrchestratorResult", "APIResponse",
     "OptimizationRequest", "OptimizationResult",
+    "CoverageStats", "CampaignCoverageRead",
 ]

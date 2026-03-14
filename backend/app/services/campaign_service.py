@@ -1,77 +1,124 @@
 """
 Campaign Service
+================
 Handles all database operations for campaigns and orchestration coordination.
-Uses the InXiteOut CampaignX API for customer cohort, campaign sending, and
-performance reporting via dynamic tool discovery.
+
+Changes for final round:
+- Uses cohort_service for cohort management (replaces inline _get_cohort)
+- record_campaign_coverage(): writes CampaignCoverage rows after every send
+- get_coverage_stats(): returns CoverageStats for the /api/coverage endpoint
+- get_uncovered_customer_ids(): returns IDs not yet covered (drives exclude_ids)
+- Optimization loop now targets ONLY non-openers (EO=N) and non-clickers (EC=N)
+  using the get_report API — does NOT re-send to already-engaged customers
 """
 import logging
 from datetime import datetime, timezone
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, Set
 
 from sqlalchemy.orm import Session
 
-from app.models.campaign import Campaign, CampaignPerformance
+from app.models.campaign import Campaign, CampaignPerformance, CampaignCoverage
 from app.schemas import (
     CampaignCreate, CampaignRead, CampaignApprove, CampaignEdit,
-    CampaignAnalytics, OrchestratorResult, OptimizationResult,
+    CampaignAnalytics, OrchestratorResult, OptimizationResult, CoverageStats,
 )
 from app.agents.orchestrator import run_orchestrator
 from app.utils.inxiteout_api import (
-    get_customer_cohort, send_campaign as api_send_campaign,
-    get_report, make_send_time,
+    send_campaign as api_send_campaign,
+    get_report,
+    make_send_time,
+)
+from app.services.cohort_service import (
+    get_customer_cohort_cached,
+    refresh_customer_cohort as _refresh_cohort,
+    cohort_to_agent_users,
+    get_all_cohort_ids,
 )
 from app.config import settings
 
 logger = logging.getLogger(__name__)
 
-# Cache cohort for the duration of the process (reset by restarting server)
-_cohort_cache: Optional[List[Dict[str, Any]]] = None
 
-
-def _get_cohort() -> List[Dict[str, Any]]:
-    """Return the customer cohort from InXiteOut API (cached in memory)."""
-    global _cohort_cache
-    if _cohort_cache is None:
-        logger.info("[CampaignService] Fetching fresh customer cohort from CampaignX API...")
-        _cohort_cache = get_customer_cohort()
-        logger.info(f"[CampaignService] Cohort loaded: {len(_cohort_cache)} customers")
-    return _cohort_cache
-
+# ── Cohort helpers (thin wrappers so routes.py can import from campaign_service) ─
 
 def refresh_cohort() -> int:
-    """Force-refresh the cohort cache. Call this at start of Test phase (14 March)."""
-    global _cohort_cache
-    _cohort_cache = None
-    cohort = _get_cohort()
-    return len(cohort)
+    """Force-refresh the cohort from the CampaignX API. Returns new cohort size."""
+    return _refresh_cohort()
 
 
-def _cohort_to_agent_users(cohort: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+def _get_agent_users() -> List[Dict[str, Any]]:
+    """Return cohort as agent-ready user dicts (cached)."""
+    return cohort_to_agent_users()
+
+
+# ── Coverage functions ─────────────────────────────────────────────────────────
+
+def record_campaign_coverage(db: Session, campaign_id: int, customer_ids: List[str]) -> int:
     """
-    Map InXiteOut cohort fields to the format expected by the segmentation agent.
-    InXiteOut fields: customer_id, Full_name, Occupation, Monthly_Income,
-                      Credit score, City, Gender, Age, Marital_Status, etc.
+    Write CampaignCoverage rows for every customer_id sent in this campaign.
+    Uses UniqueConstraint to safely ignore duplicates.
+    Returns number of newly recorded rows.
     """
-    users = []
-    for c in cohort:
-        users.append({
-            "id": c.get("customer_id", ""),          # string e.g. "CUST0001"
-            "name": c.get("Full_name", ""),
-            "email": c.get("email", ""),
-            "state": c.get("City", ""),               # City used as location filter
-            "profession": c.get("Occupation", ""),
-            "income": (c.get("Monthly_Income") or 0) * 12,  # annual
-            "credit_score": c.get("Credit score") or c.get("credit_score") or 0,
-            "gender": c.get("Gender", ""),
-            "age": c.get("Age", 0),
-            "marital_status": c.get("Marital_Status", ""),
-            "kyc_status": c.get("KYC status", ""),
-            "existing_customer": c.get("Existing Customer", ""),
-            "app_installed": c.get("App_Installed", ""),
-            "social_media_active": c.get("Social_Media_Active", ""),
-        })
-    return users
+    added = 0
+    for cid in customer_ids:
+        exists = db.query(CampaignCoverage).filter_by(
+            campaign_id=campaign_id, customer_id=cid
+        ).first()
+        if not exists:
+            db.add(CampaignCoverage(campaign_id=campaign_id, customer_id=cid))
+            added += 1
+    db.commit()
+    logger.info(f"[Coverage] Recorded {added} new coverage rows for campaign {campaign_id}")
+    return added
 
+
+def get_covered_ids(db: Session) -> List[str]:
+    """Return all customer_ids covered by at least one sent campaign."""
+    rows = db.query(CampaignCoverage.customer_id).distinct().all()
+    return [r[0] for r in rows]
+
+
+def get_uncovered_customer_ids(db: Session) -> List[str]:
+    """
+    Return customer_ids from the live cohort that have NOT yet been covered.
+    These drive the exclude_ids parameter in the segmentation agent so that
+    new campaigns are automatically constrained to uncovered customers.
+    Returns [] if the cohort is not yet loaded (before refresh-cohort is called).
+    """
+    try:
+        all_ids: Set[str] = set(get_all_cohort_ids())
+    except Exception as e:
+        logger.warning(f"[Coverage] Could not load cohort IDs: {e}. Returning empty uncovered list.")
+        return []
+    covered: Set[str] = set(get_covered_ids(db))
+    uncovered = sorted(all_ids - covered)
+    logger.info(f"[Coverage] Cohort: {len(all_ids)} | Covered: {len(covered)} | Uncovered: {len(uncovered)}")
+    return uncovered
+
+
+def get_coverage_stats(db: Session) -> CoverageStats:
+    """Return full coverage statistics for the GET /api/coverage endpoint."""
+    try:
+        all_ids = get_all_cohort_ids()
+    except Exception as e:
+        logger.warning(f"[Coverage] Could not load cohort IDs: {e}. Returning zeroed stats.")
+        all_ids = []
+    covered = get_covered_ids(db)
+    covered_set = set(covered)
+    uncovered = [cid for cid in all_ids if cid not in covered_set]
+    total = len(all_ids)
+    cov_count = len(covered_set)
+    return CoverageStats(
+        total_cohort_size=total,
+        covered_count=cov_count,
+        uncovered_count=len(uncovered),
+        coverage_percent=round((cov_count / total * 100), 2) if total else 0.0,
+        covered_ids=sorted(covered_set),
+        uncovered_ids=uncovered,
+    )
+
+
+# ── Campaign CRUD ──────────────────────────────────────────────────────────────
 
 def create_campaign(db: Session, payload: CampaignCreate) -> Campaign:
     """Create a new campaign record in draft state."""
@@ -86,19 +133,23 @@ def create_campaign(db: Session, payload: CampaignCreate) -> Campaign:
 def run_campaign_pipeline(db: Session, campaign_id: int) -> OrchestratorResult:
     """
     Fetch real customer cohort from CampaignX API, run the full orchestration
-    pipeline, and persist results to the Campaign record.
+    pipeline (strategy -> content -> compliance -> segmentation), and persist results.
+
+    The orchestrator receives uncovered_ids so the segmentation agent automatically
+    excludes already-covered customers — guaranteeing no duplicate targeting.
     """
     campaign = db.query(Campaign).filter(Campaign.id == campaign_id).first()
     if not campaign:
         raise ValueError(f"Campaign {campaign_id} not found")
 
-    # Use real cohort from InXiteOut API
-    cohort = _get_cohort()
-    all_users = _cohort_to_agent_users(cohort)
+    all_users = _get_agent_users()
 
-    result = run_orchestrator(campaign.objective, campaign_id, all_users)
+    # Pass already-COVERED IDs so segmentation agent excludes them (avoids duplicate targeting)
+    covered_ids = get_covered_ids(db)
+    logger.info(f"[CampaignService] {len(covered_ids)} already-covered IDs excluded from segmentation")
 
-    # Persist agent outputs to DB
+    result = run_orchestrator(campaign.objective, campaign_id, all_users, exclude_ids=covered_ids)
+
     campaign.strategy_json = result.strategy.model_dump()
     campaign.email_json = result.email_content.model_dump()
     campaign.segmentation_json = result.segmentation.model_dump()
@@ -120,6 +171,34 @@ def list_campaigns(db: Session) -> List[Campaign]:
     return db.query(Campaign).order_by(Campaign.created_at.desc()).all()
 
 
+def list_campaigns_with_stats(db: Session) -> List[Dict[str, Any]]:
+    """
+    Return campaigns as dicts enriched with performance data:
+    emails_sent, emails_opened, emails_clicked, open_rate, click_rate.
+    Used by the Dashboard to show EO/EC counts per campaign and a total score.
+    """
+    campaigns = db.query(Campaign).order_by(Campaign.created_at.desc()).all()
+    result = []
+    for c in campaigns:
+        perf = db.query(CampaignPerformance).filter(
+            CampaignPerformance.campaign_id == c.id
+        ).order_by(CampaignPerformance.id.desc()).first()
+
+        row = CampaignRead.model_validate(c).model_dump()
+        if perf:
+            row["perf"] = {
+                "emails_sent": perf.emails_sent,
+                "emails_opened": perf.emails_opened,
+                "emails_clicked": perf.emails_clicked,
+                "open_rate": perf.open_rate,
+                "click_rate": perf.click_rate,
+            }
+        else:
+            row["perf"] = None
+        result.append(row)
+    return result
+
+
 def approve_campaign(db: Session, campaign_id: int, payload: CampaignApprove) -> Campaign:
     """Approve or reject a campaign. Stores the human-selected send_time on approval."""
     campaign = db.query(Campaign).filter(Campaign.id == campaign_id).first()
@@ -132,7 +211,6 @@ def approve_campaign(db: Session, campaign_id: int, payload: CampaignApprove) ->
         campaign.status = "approved"
         campaign.approved_by = payload.approved_by
         campaign.approval_timestamp = datetime.now(timezone.utc)
-        # Store the send_time set by the human (or auto-generate 5 min ahead)
         campaign.send_time = payload.send_time or make_send_time(minutes_ahead=5)
         db.commit()
         db.refresh(campaign)
@@ -176,8 +254,10 @@ def edit_campaign_email(db: Session, campaign_id: int, payload: CampaignEdit) ->
 
 def send_approved_campaign(db: Session, campaign_id: int) -> CampaignPerformance:
     """
-    Send an approved campaign via the InXiteOut CampaignX API (dynamic tool discovery).
-    Immediately fetches the performance report and stores real open/click metrics.
+    Send an approved campaign via the InXiteOut CampaignX API.
+    After a successful send:
+    1. Records coverage (CampaignCoverage rows) for all recipients.
+    2. Fetches real open/click metrics from the get_report API.
     """
     campaign = db.query(Campaign).filter(Campaign.id == campaign_id).first()
     if not campaign:
@@ -195,13 +275,10 @@ def send_approved_campaign(db: Session, campaign_id: int) -> CampaignPerformance
     if not customer_ids:
         raise ValueError("No customer IDs in segmentation — cannot send campaign")
 
-    # Use stored send_time or auto-generate
     send_time = campaign.send_time or make_send_time(minutes_ahead=5)
 
-    logger.info(f"[CampaignService] Calling CampaignX send_campaign API for {len(customer_ids)} customers "
-                f"at {send_time}")
+    logger.info(f"[CampaignService] Sending to {len(customer_ids)} customers at {send_time}")
 
-    # ── Call InXiteOut send_campaign via dynamic tool discovery ───────────────
     send_result = api_send_campaign(
         subject=subject,
         body=body,
@@ -212,36 +289,37 @@ def send_approved_campaign(db: Session, campaign_id: int) -> CampaignPerformance
     campaignx_id = send_result.get("campaign_id", "")
     logger.info(f"[CampaignService] CampaignX campaign_id={campaignx_id}")
 
-    # Store the CampaignX campaign UUID for report fetching
     campaign.campaignx_campaign_id = campaignx_id
     campaign.status = "sent"
     db.commit()
 
-    # ── Fetch real performance report via dynamic tool discovery ──────────────
+    # ── Record coverage automatically ──────────────────────────────────────────
+    record_campaign_coverage(db, campaign_id, customer_ids)
+
+    # ── Fetch live performance metrics ─────────────────────────────────────────
     report = get_report(campaignx_id)
     performance = _build_performance_from_report(db, campaign_id, report, len(customer_ids))
 
     db.refresh(campaign)
-    logger.info(f"[CampaignService] Real metrics → open_rate={performance.open_rate:.1%}, "
+    logger.info(f"[CampaignService] Metrics: open_rate={performance.open_rate:.1%}, "
                 f"click_rate={performance.click_rate:.1%}")
     return performance
 
 
 def _build_email_body(email_json: Dict[str, Any]) -> str:
-    """Compose the full email body with disclaimer, ensuring CTA URL is present."""
+    """Compose full email body with disclaimer, ensuring CTA URL is present."""
     body = email_json.get("email_body", "")
     cta = email_json.get("cta_text", "")
     disclaimer = email_json.get("disclaimer", "")
     cta_url = "https://superbfsi.com/xdeposit/explore/"
 
-    # Always include the official CTA URL in the body
     if cta_url not in body:
         body = f"{body}\n\n{cta}: {cta_url}"
 
     if disclaimer and disclaimer not in body:
         body = f"{body}\n\n---\n{disclaimer}"
 
-    return body[:5000]  # API max 5000 chars
+    return body[:5000]
 
 
 def _build_performance_from_report(
@@ -250,7 +328,7 @@ def _build_performance_from_report(
     report: Dict[str, Any],
     total_sent: int,
 ) -> CampaignPerformance:
-    """Parse the InXiteOut report response and create a CampaignPerformance record."""
+    """Parse InXiteOut report response and create a CampaignPerformance record."""
     rows = report.get("data", [])
 
     emails_opened = sum(1 for r in rows if r.get("EO") == "Y")
@@ -264,7 +342,7 @@ def _build_performance_from_report(
         campaign_id=campaign_id,
         open_rate=open_rate,
         click_rate=click_rate,
-        sentiment_score=None,   # not provided by InXiteOut API
+        sentiment_score=None,
         emails_sent=emails_sent,
         emails_opened=emails_opened,
         emails_clicked=emails_clicked,
@@ -277,7 +355,7 @@ def _build_performance_from_report(
 
 
 def get_campaign_analytics(db: Session, campaign_id: int) -> CampaignAnalytics:
-    """Fetch campaign + performance data. If sent, re-fetch latest report from API."""
+    """Fetch campaign + performance data. Re-fetches latest report if available."""
     campaign = db.query(Campaign).filter(Campaign.id == campaign_id).first()
     if not campaign:
         raise ValueError(f"Campaign {campaign_id} not found")
@@ -286,8 +364,6 @@ def get_campaign_analytics(db: Session, campaign_id: int) -> CampaignAnalytics:
         CampaignPerformance.campaign_id == campaign_id
     ).order_by(CampaignPerformance.id.desc()).first()
 
-    # If we have a CampaignX ID and already have perf, optionally re-fetch
-    # (helps get updated metrics; safe to call multiple times)
     if campaign.campaignx_campaign_id and not perf:
         try:
             report = get_report(campaign.campaignx_campaign_id)
@@ -309,7 +385,7 @@ def get_campaign_analytics(db: Session, campaign_id: int) -> CampaignAnalytics:
         else:
             engagement = "low"
             tone_rec = "Consider adjusting tone — more personalised or empathetic copy may improve open rates."
-            persona_rec = "Review persona targeting — the current segment may need refinement or micro-segmentation."
+            persona_rec = "Review persona targeting — the current segment may need refinement."
 
         learning_insights = {
             "engagement_level": engagement,
@@ -338,19 +414,42 @@ def run_optimization_loop(
     send_time: Optional[str] = None,
 ) -> OptimizationResult:
     """
-    Autonomous Optimization Loop (§6.8):
-    1. Read performance from the original sent campaign.
-    2. Build an enriched objective that instructs agents to fix weaknesses.
-    3. Run the full agent pipeline on the new objective (new campaign row).
-    4. Auto-approve + send the new campaign.
-    5. Return the OptimizationResult for human visibility.
+    Autonomous Optimization Loop — Final Round Edition.
+
+    Scoring criterion: maximize raw EO=Y + EC=Y counts across the cohort.
+    Strategy:
+      1. Fetch report for the original campaign.
+      2. Identify non-openers (EO=N) and non-clickers (EO=Y, EC=N).
+      3. Target the larger sub-group with a new optimized email.
+      4. Auto-approve and send. Record coverage.
+
+    This avoids re-sending to already-engaged customers, maximising new EO/EC events.
     """
     original = db.query(Campaign).filter(Campaign.id == campaign_id).first()
     if not original:
         raise ValueError(f"Campaign {campaign_id} not found")
     if original.status != "sent":
-        raise ValueError(f"Campaign {campaign_id} has not been sent yet — run it first")
+        raise ValueError(f"Campaign {campaign_id} has not been sent yet")
+    if not original.campaignx_campaign_id:
+        raise ValueError(f"Campaign {campaign_id} has no CampaignX ID — cannot fetch report")
 
+    # ── 1. Fetch report and build engagement maps ──────────────────────────────
+    logger.info(f"[OptimizationLoop] Fetching report for campaign_id={campaign_id}")
+    report = get_report(original.campaignx_campaign_id)
+    rows = report.get("data", [])
+
+    eo_map: Dict[str, str] = {r["customer_id"]: r.get("EO", "N") for r in rows if "customer_id" in r}
+    ec_map: Dict[str, str] = {r["customer_id"]: r.get("EC", "N") for r in rows if "customer_id" in r}
+
+    original_seg = original.segmentation_json or {}
+    original_ids: List[str] = original_seg.get("selected_user_ids", [])
+
+    non_opener_ids  = [cid for cid in original_ids if eo_map.get(cid, "N") == "N"]
+    non_clicker_ids = [cid for cid in original_ids if eo_map.get(cid, "N") == "Y" and ec_map.get(cid, "N") == "N"]
+
+    logger.info(f"[OptimizationLoop] Non-openers: {len(non_opener_ids)}, Non-clickers: {len(non_clicker_ids)}")
+
+    # ── 2. Choose target sub-group ─────────────────────────────────────────────
     perf = db.query(CampaignPerformance).filter(
         CampaignPerformance.campaign_id == campaign_id
     ).order_by(CampaignPerformance.id.desc()).first()
@@ -358,54 +457,81 @@ def run_optimization_loop(
     open_rate  = perf.open_rate  if perf else 0.0
     click_rate = perf.click_rate if perf else 0.0
 
-    # Build an enriched objective with performance context for the agents
-    strategy = original.strategy_json or {}
-    email    = original.email_json or {}
-    seg      = original.segmentation_json or {}
+    if len(non_opener_ids) >= len(non_clicker_ids):
+        target_ids = non_opener_ids
+        weakness = "open"
+        weakness_instruction = (
+            "Non-openers did not open the email — the subject line failed to capture attention. "
+            "Generate a completely different subject line using a bold curiosity gap, specific benefit "
+            "with a number, or a direct personalised question. Under 55 characters, English only. "
+            "Also rewrite the first two sentences of the body to be immediately compelling."
+        )
+    else:
+        target_ids = non_clicker_ids
+        weakness = "click"
+        weakness_instruction = (
+            "Non-clickers opened the email but did not click through. "
+            "Rewrite the body with a clearer, more specific value proposition. "
+            "Make the CTA more urgent and action-oriented. "
+            "Ensure the URL https://superbfsi.com/xdeposit/explore/ is clearly prominent."
+        )
+
+    if not target_ids:
+        raise ValueError(
+            f"No {'non-openers' if weakness == 'open' else 'non-clickers'} found — "
+            "all recipients already engaged with this campaign."
+        )
+
+    # ── 3. Build enriched objective ────────────────────────────────────────────
+    strategy_data = original.strategy_json or {}
+    email_data    = original.email_json or {}
 
     optimization_context = (
-        f"OPTIMIZATION RUN — Previous campaign performance: "
-        f"open_rate={open_rate:.1%}, click_rate={click_rate:.1%}. "
-        f"Previous tone: {strategy.get('tone','formal')}. "
-        f"Previous persona: {strategy.get('target_persona','')}. "
-        f"Previous subject: {email.get('subject_line','')}. "
+        f"OPTIMIZATION: targeting {len(target_ids)} {'non-openers' if weakness == 'open' else 'non-clickers'} "
+        f"from campaign {campaign_id}.\n"
+        f"Previous metrics: open_rate={open_rate:.1%}, click_rate={click_rate:.1%}.\n"
+        f"Previous subject: \"{email_data.get('subject_line', '')}\".\n"
+        f"Previous tone: {strategy_data.get('tone', 'formal')}.\n"
+        f"Weakness: {weakness_instruction}"
     )
-    if open_rate <= settings.OPEN_RATE_THRESHOLD:
-        optimization_context += (
-            "Open rate was below threshold. Improve subject line, try a different tone, "
-            "or target a micro-segment with higher engagement propensity. "
-        )
-    if click_rate <= 0.05:
-        optimization_context += (
-            "Click rate was low. Strengthen the CTA, make the value proposition clearer, "
-            "or personalise the body content further. "
-        )
-
     new_objective = f"{optimization_context}\n\nOriginal objective: {original.objective}"
 
-    # Create a new campaign row for the optimized variant
+    # ── 4. Run agent pipeline on subset ───────────────────────────────────────
+    all_users = _get_agent_users()
+    target_id_set = set(target_ids)
+    subset_users = [u for u in all_users if u["id"] in target_id_set]
+
     new_campaign = Campaign(objective=new_objective, status="draft")
     db.add(new_campaign)
     db.commit()
     db.refresh(new_campaign)
 
-    # Run full pipeline on new campaign
-    cohort = _get_cohort()
-    all_users = _cohort_to_agent_users(cohort)
-    result = run_orchestrator(new_objective, new_campaign.id, all_users)
+    result = run_orchestrator(new_objective, new_campaign.id, subset_users, exclude_ids=[])
 
-    new_campaign.strategy_json    = result.strategy.model_dump()
-    new_campaign.email_json       = result.email_content.model_dump()
-    new_campaign.segmentation_json = result.segmentation.model_dump()
-    new_campaign.compliance_json  = result.compliance.model_dump()
-    new_campaign.status           = "approved"
-    new_campaign.approved_by      = approved_by
+    # Force segmentation to exactly the target_ids (don't let agent narrow further)
+    from app.schemas import SegmentationOutput
+    forced_seg = SegmentationOutput(
+        filters_applied=(
+            f"Optimization resend — {'non-openers' if weakness == 'open' else 'non-clickers'} "
+            f"from campaign {campaign_id} ({len(target_ids)} recipients)"
+        ),
+        selected_user_count=len(target_ids),
+        selected_user_ids=target_ids,
+        reasoning=f"Targeting {weakness} sub-group only to maximise new EO/EC counts.",
+    )
+
+    new_campaign.strategy_json     = result.strategy.model_dump()
+    new_campaign.email_json        = result.email_content.model_dump()
+    new_campaign.segmentation_json = forced_seg.model_dump()
+    new_campaign.compliance_json   = result.compliance.model_dump()
+    new_campaign.status            = "approved"
+    new_campaign.approved_by       = approved_by
     new_campaign.approval_timestamp = datetime.now(timezone.utc)
-    new_campaign.send_time        = send_time or make_send_time(minutes_ahead=5)
+    new_campaign.send_time         = send_time or make_send_time(minutes_ahead=5)
     db.commit()
     db.refresh(new_campaign)
 
-    # Send via real API
+    # ── 5. Send + auto-record coverage ────────────────────────────────────────
     send_approved_campaign(db, new_campaign.id)
 
     return OptimizationResult(
@@ -413,10 +539,69 @@ def run_optimization_loop(
         new_campaign_id=new_campaign.id,
         strategy=result.strategy,
         email_content=result.email_content,
-        segmentation=result.segmentation,
+        segmentation=forced_seg,
         compliance=result.compliance,
         compliance_retries=result.compliance_retries,
         summary_explanation=result.summary_explanation,
         optimization_reasoning=optimization_context,
         status="sent",
     )
+
+
+# ── Debug helpers ──────────────────────────────────────────────────────────────
+
+def debug_segment_size(db: Session) -> Dict[str, Any]:
+    """
+    Run a single broad segmentation pass and return diagnostic info.
+    Used by GET /api/debug/segment-size to verify segmentation health
+    before committing to real campaign runs.
+
+    Returns:
+        {
+          "segment_size": int,
+          "occupations": list[str],
+          "excluded_count": int,
+          "filters_applied": str,
+        }
+    """
+    from app.agents.segmentation_agent import run_segmentation_agent, LIVE_OCCUPATIONS
+    from app.schemas import StrategyOutput
+
+    all_users = _get_agent_users()
+    covered_ids = get_covered_ids(db)
+
+    # Broad generic persona — exercises the occupation filter path without
+    # being so narrow that it triggers the size-fallback cascade.
+    test_strategy = StrategyOutput(
+        campaign_goal="Maximise email opens and clicks for a high-yield savings deposit offer",
+        target_persona=(
+            "Target IT professionals and engineers in India who would benefit from a high-yield "
+            "savings deposit product. Include professionals with stable incomes who are likely "
+            "to engage with financial products."
+        ),
+        tone="professional",
+        key_message="Grow your savings with a high-yield fixed deposit — limited time offer.",
+        reasoning="Debug run: broad IT/engineer persona to verify segment size and exclusion logic.",
+    )
+
+    result = run_segmentation_agent(test_strategy, all_users, exclude_ids=covered_ids)
+
+    # Extract the occupation keywords the agent chose from filters_applied
+    selected_occupations: List[str] = []
+    for part in result.filters_applied.split(";"):
+        part = part.strip()
+        if part.lower().startswith("occupations:"):
+            selected_occupations = [o.strip() for o in part[len("occupations:"):].split(",")]
+            break
+
+    logger.info(
+        f"[DebugSegment] segment_size={result.selected_user_count} | "
+        f"occupations={selected_occupations} | excluded={len(covered_ids)}"
+    )
+
+    return {
+        "segment_size": result.selected_user_count,
+        "occupations": selected_occupations,
+        "excluded_count": len(covered_ids),
+        "filters_applied": result.filters_applied,
+    }

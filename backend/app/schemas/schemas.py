@@ -157,3 +157,29 @@ class OptimizationResult(BaseModel):
     summary_explanation: str
     optimization_reasoning: str
     status: str
+
+
+# ─── Coverage Tracking (Final Round) ──────────────────────────────────────────
+
+class CoverageStats(BaseModel):
+    """
+    Coverage statistics for the 1000-customer cohort.
+    Scoring is based on maximizing total EO=Y + EC=Y raw counts across the cohort.
+    All 1000 customers must be covered before the evaluation window closes.
+    """
+    total_cohort_size: int
+    covered_count: int
+    uncovered_count: int
+    coverage_percent: float
+    covered_ids: List[str]
+    uncovered_ids: List[str]
+
+
+class CampaignCoverageRead(BaseModel):
+    id: int
+    campaign_id: int
+    customer_id: str
+    timestamp: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True

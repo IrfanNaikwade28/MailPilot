@@ -4,7 +4,7 @@ Coordinates all agents in the correct order, manages the compliance retry loop,
 and produces the final aggregated campaign object with a human-readable summary.
 """
 import logging
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 
 from app.schemas import (
     StrategyOutput, EmailContentOutput, SegmentationOutput,
@@ -54,6 +54,7 @@ def run_orchestrator(
     objective: str,
     campaign_id: int,
     all_users: List[Dict[str, Any]],
+    exclude_ids: Optional[List[str]] = None,
 ) -> OrchestratorResult:
     """
     Main orchestration flow:
@@ -67,6 +68,7 @@ def run_orchestrator(
         objective: Natural language campaign objective.
         campaign_id: DB campaign ID for reference.
         all_users: All users from DB as list of dicts.
+        exclude_ids: Customer IDs already covered; passed to segmentation to avoid overlap.
 
     Returns:
         OrchestratorResult: Full aggregated campaign result.
@@ -107,7 +109,7 @@ def run_orchestrator(
 
     # Step 4: Segmentation
     logger.info("[Orchestrator] Step 4/4 — Segmentation Agent")
-    segmentation = run_segmentation_agent(strategy, all_users)
+    segmentation = run_segmentation_agent(strategy, all_users, exclude_ids=exclude_ids)
 
     # Step 5: Build summary
     summary = _build_summary(objective, strategy, email_content, segmentation, compliance, compliance_retries)

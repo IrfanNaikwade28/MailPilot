@@ -9,6 +9,9 @@ from app.services.campaign_service import (
     send_approved_campaign,
     run_optimization_loop,
     refresh_cohort,
+    record_campaign_coverage,
+    get_coverage_stats,
+    get_uncovered_customer_ids,
 )
 
 __all__ = [
@@ -22,4 +25,7 @@ __all__ = [
     "send_approved_campaign",
     "run_optimization_loop",
     "refresh_cohort",
+    "record_campaign_coverage",
+    "get_coverage_stats",
+    "get_uncovered_customer_ids",
 ]

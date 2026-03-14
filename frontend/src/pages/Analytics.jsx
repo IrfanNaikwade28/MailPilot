@@ -47,6 +47,11 @@ const S = {
   statValue: { fontSize: 30, fontWeight: 700, lineHeight: 1, margin: 0 },
   statLabel: { fontSize: 12, color: '#6b7280', marginTop: 6, fontWeight: 500 },
 
+  scoreRow: { display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 16 },
+  scoreCard: { borderRadius: 8, padding: '16px', textAlign: 'center', background: 'linear-gradient(135deg, #1d4ed8 0%, #7c3aed 100%)' },
+  scoreValue: { fontSize: 36, fontWeight: 700, color: '#fff', lineHeight: 1, margin: 0 },
+  scoreLabel: { fontSize: 11, color: 'rgba(255,255,255,0.8)', marginTop: 6, fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.04em' },
+
   gaugeRow: { marginBottom: 16 },
   gaugeTop: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },
   gaugeLabel: { fontSize: 13, color: '#374151', fontWeight: 500 },
@@ -90,11 +95,12 @@ function GaugeBar({ label, value, color }) {
   )
 }
 
-function StatCard({ value, label, bg, color }) {
+function StatCard({ value, label, bg, color, sub }) {
   return (
     <div style={{ ...S.statCard, background: bg }}>
       <p style={{ ...S.statValue, color }}>{value}</p>
       <p style={S.statLabel}>{label}</p>
+      {sub && <p style={{ fontSize: 11, color: '#9ca3af', marginTop: 2 }}>{sub}</p>}
     </div>
   )
 }
@@ -214,31 +220,58 @@ export default function Analytics() {
 
       {/* Performance */}
       {perf ? (
-        <div style={S.twoCol}>
-          <div style={S.section}>
-            <div style={S.sectionHead}><p style={S.sectionTitle}>Delivery Metrics</p></div>
+        <>
+          {/* EO+EC score row */}
+          <div style={{ ...S.section, marginBottom: 12 }}>
+            <div style={S.sectionHead}><p style={S.sectionTitle}>Hackathon Score Contribution — Raw Counts</p></div>
             <div style={{ ...S.sectionBody, padding: '16px' }}>
-              <div style={S.statsGrid}>
-                <StatCard value={perf.emails_sent} label="Emails Sent" bg="#eff6ff" color="#1d4ed8" />
-                <StatCard value={perf.emails_opened} label="Opened" bg="#f0fdf4" color="#15803d" />
-                <StatCard value={perf.emails_clicked} label="Clicked CTA" bg="#faf5ff" color="#7e22ce" />
-                <StatCard
-                  value={perf.emails_sent > 0 ? `${((perf.emails_clicked / perf.emails_sent) * 100).toFixed(1)}%` : '—'}
-                  label="Click Rate"
-                  bg="#fffbeb"
-                  color="#b45309"
-                />
+              <div style={S.scoreRow}>
+                <div style={S.scoreCard}>
+                  <p style={S.scoreValue}>{(perf.emails_opened || 0) + (perf.emails_clicked || 0)}</p>
+                  <p style={S.scoreLabel}>EO + EC Score</p>
+                </div>
+                <div style={{ ...S.statCard, background: '#f0fdf4' }}>
+                  <p style={{ ...S.statValue, color: '#15803d', fontSize: 36 }}>{perf.emails_opened}</p>
+                  <p style={S.statLabel}>Opens (EO=Y)</p>
+                  <p style={{ fontSize: 11, color: '#9ca3af', marginTop: 2 }}>
+                    {perf.emails_sent > 0 ? `${((perf.emails_opened / perf.emails_sent) * 100).toFixed(1)}% open rate` : ''}
+                  </p>
+                </div>
+                <div style={{ ...S.statCard, background: '#faf5ff' }}>
+                  <p style={{ ...S.statValue, color: '#7e22ce', fontSize: 36 }}>{perf.emails_clicked}</p>
+                  <p style={S.statLabel}>Clicks (EC=Y)</p>
+                  <p style={{ fontSize: 11, color: '#9ca3af', marginTop: 2 }}>
+                    {perf.emails_sent > 0 ? `${((perf.emails_clicked / perf.emails_sent) * 100).toFixed(1)}% click rate` : ''}
+                  </p>
+                </div>
               </div>
             </div>
           </div>
-          <div style={S.section}>
-            <div style={S.sectionHead}><p style={S.sectionTitle}>Performance Rates</p></div>
-            <div style={S.sectionBody}>
-              <GaugeBar label="Open Rate" value={perf.open_rate || 0} color="#22c55e" />
-              <GaugeBar label="Click Rate" value={perf.click_rate || 0} color="#3b82f6" />
+
+          <div style={S.twoCol}>
+            <div style={S.section}>
+              <div style={S.sectionHead}><p style={S.sectionTitle}>Delivery Metrics</p></div>
+              <div style={{ ...S.sectionBody, padding: '16px' }}>
+                <div style={S.statsGrid}>
+                  <StatCard value={perf.emails_sent} label="Emails Sent" bg="#eff6ff" color="#1d4ed8" />
+                  <StatCard
+                    value={perf.emails_sent > 0 ? `${((perf.emails_clicked / perf.emails_sent) * 100).toFixed(1)}%` : '—'}
+                    label="Click Rate"
+                    bg="#fffbeb"
+                    color="#b45309"
+                  />
+                </div>
+              </div>
+            </div>
+            <div style={S.section}>
+              <div style={S.sectionHead}><p style={S.sectionTitle}>Performance Rates</p></div>
+              <div style={S.sectionBody}>
+                <GaugeBar label="Open Rate" value={perf.open_rate || 0} color="#22c55e" />
+                <GaugeBar label="Click Rate" value={perf.click_rate || 0} color="#3b82f6" />
+              </div>
             </div>
           </div>
-        </div>
+        </>
       ) : (
         <div style={{ ...S.section, marginBottom: 16 }}>
           <div style={{ ...S.sectionBody, ...S.empty }}>

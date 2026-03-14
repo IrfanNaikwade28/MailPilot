@@ -9,13 +9,15 @@ from app.database import get_db
 from app.schemas import (
     CampaignCreate, CampaignRead, CampaignApprove, CampaignEdit,
     CampaignAnalytics, OrchestratorResult, APIResponse, UserCreate, UserRead,
-    OptimizationRequest, OptimizationResult,
+    OptimizationRequest, OptimizationResult, CoverageStats,
 )
 from app.services import (
     create_campaign, run_campaign_pipeline, get_campaign, list_campaigns,
     approve_campaign, edit_campaign_email, get_campaign_analytics,
     send_approved_campaign, run_optimization_loop, refresh_cohort,
+    get_coverage_stats, get_uncovered_customer_ids,
 )
+from app.services.campaign_service import debug_segment_size, list_campaigns_with_stats
 from app.models.user import User
 
 logger = logging.getLogger(__name__)
@@ -49,6 +51,15 @@ def list_campaigns_endpoint(db: Session = Depends(get_db)):
     """List all campaigns ordered by creation date (newest first)."""
     campaigns = list_campaigns(db)
     return campaigns
+
+
+@router.get("/campaign/list-with-stats", tags=["Campaign"])
+def list_campaigns_with_stats_endpoint(db: Session = Depends(get_db)):
+    """
+    List all campaigns enriched with performance data (emails_sent, opened, clicked, rates).
+    Used by Dashboard to display per-campaign EO/EC counts and total hackathon score.
+    """
+    return list_campaigns_with_stats(db)
 
 
 @router.get("/campaign/{campaign_id}", response_model=CampaignRead, tags=["Campaign"])
@@ -185,7 +196,46 @@ def refresh_cohort_endpoint(db: Session = Depends(get_db)):
     return APIResponse(success=True, message=f"Cohort refreshed: {count} customers loaded.", data={"count": count})
 
 
+# ─── Coverage Endpoints ────────────────────────────────────────────────────────
+
+@router.get("/coverage", response_model=CoverageStats, tags=["Coverage"])
+def get_coverage_endpoint(db: Session = Depends(get_db)):
+    """Get cohort coverage stats: total, covered, uncovered, and per-campaign breakdown."""
+    return get_coverage_stats(db)
+
+
+@router.get("/coverage/uncovered-ids", response_model=list[str], tags=["Coverage"])
+def get_uncovered_ids_endpoint(db: Session = Depends(get_db)):
+    """Return the list of customer IDs not yet covered by any sent campaign."""
+    return get_uncovered_customer_ids(db)
+
+
 @router.get("/health", tags=["Health"])
 def health_check():
     """Health check endpoint."""
     return {"status": "healthy", "service": "MailPilot"}
+
+
+# ─── Debug Endpoints ──────────────────────────────────────────────────────────
+
+@router.get("/debug/segment-size", tags=["Debug"])
+def debug_segment_size_endpoint(db: Session = Depends(get_db)):
+    """
+    Temporary diagnostic endpoint — run segmentation once with a broad generic
+    persona and return segment_size, occupations chosen, and excluded_count.
+
+    Use this to verify segmentation is healthy before running real campaigns.
+
+    Returns:
+        {
+          "segment_size": int,
+          "occupations": list[str],
+          "excluded_count": int,
+          "filters_applied": str
+        }
+    """
+    try:
+        return debug_segment_size(db)
+    except Exception as e:
+        logger.error(f"debug_segment_size failed: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
